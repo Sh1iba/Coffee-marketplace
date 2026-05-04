@@ -2,9 +2,6 @@
 
 package com.example.coffeeshop.presentation.screens
 
-import android.annotation.SuppressLint
-import android.content.res.Configuration
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,12 +15,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -39,9 +33,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -84,7 +75,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -98,371 +88,138 @@ import com.example.coffeeshop.data.remote.response.ProductResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
 import com.example.coffeeshop.navigation.NavigationRoutes
 import com.example.coffeeshop.presentation.theme.SoraFontFamily
-import com.example.coffeeshop.presentation.theme.colorBackgroudWhite
 import com.example.coffeeshop.presentation.theme.colorDarkOrange
 import com.example.coffeeshop.presentation.theme.colorGrey
 import com.example.coffeeshop.presentation.theme.colorGreyWhite
-import com.example.coffeeshop.presentation.theme.colorWhiteText
 import com.example.coffeeshop.presentation.viewmodel.CartViewModel
 import com.example.coffeeshop.presentation.viewmodel.HomeViewModel
 import com.example.coffeeshop.presentation.viewmodel.LocationViewModel
 import com.example.coffeeshop.presentation.viewmodel.SearchViewModel
-import kotlinx.coroutines.launch
 
 
 @Composable
 fun HomeScreen(navController: NavHostController = rememberNavController()) {
     val viewModel: HomeViewModel = hiltViewModel()
     val cartViewModel: CartViewModel = hiltViewModel()
-
-    val selectedTypeId = remember { mutableStateOf<Int?>(null) }
-    val showSizeDialog by viewModel.showSizeDialog.collectAsState()
-
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-
-    val headerHeight = (screenHeight * 0.34f).coerceIn(220.dp, 320.dp)
-    val bannerHeight = (screenHeight * 0.18f).coerceIn(110.dp, 160.dp)
-    val bannerWidth = screenWidth - 48.dp
-    val bannerOffsetY = headerHeight * 0.72f
-
-    LaunchedEffect(Unit) {
-        viewModel.loadCoffeeData()
-        cartViewModel.loadCart()
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        SecondHalfOfHomeScreen(viewModel, navController, cartViewModel)
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(headerHeight)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color(0xFF313131), Color(0xFF111111)),
-                        start = Offset(0f, Float.POSITIVE_INFINITY),
-                        end = Offset(Float.POSITIVE_INFINITY, 0f)
-                    )
-                )
-        )
-        Image(
-            painter = painterResource(id = R.drawable.banner),
-            contentDescription = "banner Image",
-            modifier = Modifier
-                .width(bannerWidth)
-                .height(bannerHeight)
-                .offset(x = 24.dp, y = bannerOffsetY),
-            contentScale = ContentScale.Crop
-        )
-        FirstHalfOfHomeScreen(viewModel = viewModel)
-
-        showSizeDialog?.let { coffee ->
-            SizeSelectionDialog(
-                coffee = coffee,
-                onDismiss = { viewModel.hideSizeSelectionDialog() },
-                onSizeSelected = { selectedSize ->
-                    cartViewModel.addToCart(coffee.id, selectedSize)
-                }
-            )
-        }
-    }
-}
-
-@SuppressLint("SuspiciousIndentation")
-@Composable
-fun SecondHalfOfHomeScreen(
-    viewModel: HomeViewModel,
-    navController: NavController,
-    cartViewModel: CartViewModel
-) {
-    val configuration = LocalConfiguration.current
-    val screenHeight = configuration.screenHeightDp.dp
-    val isTablet = configuration.screenWidthDp >= 600
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    val contentHeight = when {
-        isTablet && isLandscape -> screenHeight * 0.7f
-        isTablet -> screenHeight * 0.65f
-        else -> (screenHeight * 0.75f).coerceIn(480.dp, 680.dp)
-    }
-
-    val contentOffset = when {
-        isTablet && isLandscape -> screenHeight * 0.25f
-        isTablet -> screenHeight * 0.3f
-        else -> (screenHeight * 0.43f).coerceIn(280.dp, 420.dp)
-    }
-
-    val horizontalPadding = if (isTablet) 48.dp else 24.dp
-    val bottomSpacing = if (isTablet) 60.dp else 46.dp
-    val rowBottomPadding = if (isTablet) 24.dp else 16.dp
+    val searchViewModel: SearchViewModel = hiltViewModel()
+    val locationViewModel: LocationViewModel = hiltViewModel()
 
     val homeState by viewModel.uiState.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val sellers by viewModel.sellers.collectAsState()
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(contentHeight)
-                .offset(y = contentOffset)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = horizontalPadding)
-            ) {
-                when {
-                    isLoading -> {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = colorDarkOrange)
-                        }
-                    }
-                    error != null -> {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = error ?: "",
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    fontFamily = SoraFontFamily,
-                                    fontSize = 14.sp
-                                )
-                                TextButton(onClick = { viewModel.loadCoffeeData() }) {
-                                    Text("Повторить", color = colorDarkOrange, fontFamily = SoraFontFamily)
-                                }
-                            }
-                        }
-                    }
-                    else -> {
-                        CoffeeCategoryColumn(
-                            productList = homeState.filteredProducts,
-                            sellers = sellers,
-                            viewModel = viewModel,
-                            navController = navController,
-                            cartViewModel = cartViewModel,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                        )
-                    }
-                }
-
-            }
-        }
-}
-
-
-
-@SuppressLint("SuspiciousIndentation")
-@Composable
-fun FirstHalfOfHomeScreen(viewModel: HomeViewModel) {
-    val context = LocalContext.current
-
-    val locationViewModel: LocationViewModel = hiltViewModel()
-    val locationState by locationViewModel.uiState.collectAsState()
-
-    val searchViewModel: SearchViewModel = hiltViewModel()
+    val showSizeDialog by viewModel.showSizeDialog.collectAsState()
     val searchState by searchViewModel.uiState.collectAsState()
-
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-    val screenHeight = configuration.screenHeightDp.dp
-    val isTablet = screenWidth >= 600.dp
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    val horizontalPadding = when {
-        isTablet && isLandscape -> 48.dp
-        isTablet -> 40.dp
-        else -> 24.dp
-    }
-
-    val topPadding = when {
-        isTablet && isLandscape -> 40.dp
-        isTablet -> 80.dp
-        else -> 68.dp
-    }
-
-    val locationWidth = when {
-        isTablet -> (screenWidth * 0.3f).coerceAtMost(200.dp)
-        else -> (screenWidth * 0.5f).coerceAtMost(161.dp)
-    }
-
-    val searchBarWidth = when {
-        isTablet -> (screenWidth * 0.7f).coerceAtMost(400.dp)
-        else -> (screenWidth - horizontalPadding * 2)
-    }
-
-
-    LaunchedEffect(locationState.error) {
-        locationState.error?.let { error ->
-            println("Location Error: $error")
-            locationViewModel.clearError()
-        }
-    }
-
-
-    LaunchedEffect(searchState.searchText) {
-        viewModel.searchCoffee(searchState.searchText)
-    }
+    val locationState by locationViewModel.uiState.collectAsState()
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = topPadding)
-    ) {
+    LaunchedEffect(Unit) {
+        viewModel.loadCoffeeData()
+        cartViewModel.loadCart()
+    }
+    LaunchedEffect(searchState.searchText) {
+        viewModel.searchCoffee(searchState.searchText)
+    }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = horizontalPadding)
-        ) {
-            Column(
-                modifier = Modifier
-                    .width(locationWidth)
-                    .wrapContentHeight(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Локация",
-                    fontFamily = SoraFontFamily,
-                    fontWeight = FontWeight.W400,
-                    fontSize = if (isTablet) 14.sp else 12.sp,
-                    lineHeight = if (isTablet) 16.8.sp else 14.4.sp,
-                    color = colorGrey,
-                    modifier = Modifier.wrapContentSize()
-                )
+    val popularProducts = remember(homeState.allProducts) { homeState.allProducts.take(8) }
+    val showSections = !homeState.isSearching && homeState.selectedTypeName == "Все товары"
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (isTablet) 24.dp else 21.dp)
-                        .clickable {
-                            locationViewModel.onShowAddressDialogChange(true)
-                        },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = locationState.selectedAddress,
-                        fontFamily = SoraFontFamily,
-                        fontWeight = FontWeight.W600,
-                        fontSize = if (isTablet) 16.sp else 14.sp,
-                        lineHeight = if (isTablet) 24.sp else 21.sp,
-                        color = colorGreyWhite,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
 
-                    Image(
-                        painter = painterResource(id = R.drawable.img),
-                        contentDescription = "Custom Icon",
-                        modifier = Modifier
-                            .size(if (isTablet) 16.dp else 14.dp)
-                    )
-                }
-            }
-        }
-
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    top = if (isTablet) 32.dp else 24.dp,
-                    start = horizontalPadding,
-                    end = horizontalPadding
-                )
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(if (isTablet) 20.dp else 16.dp)
-            ) {
-
+            // ── Шапка ─────────────────────────────────────────────────────────
+            item {
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(if (isTablet) 56.dp else 52.dp)
+                        .fillMaxWidth()
                         .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color(0xFF2C2C2C), Color(0xFF2A2A2A))
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFF313131), Color(0xFF111111)),
+                                start = Offset(0f, Float.POSITIVE_INFINITY),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
                             ),
-                            shape = RoundedCornerShape(if (isTablet) 14.dp else 12.dp)
+                            shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                         )
-                        .border(
-                            width = 1.dp,
-                            color = if (searchState.isSearchFocused) colorDarkOrange else Color.Transparent,
-                            shape = RoundedCornerShape(if (isTablet) 14.dp else 12.dp)
-                        )
+                        .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                        .padding(top = 56.dp, start = 24.dp, end = 24.dp, bottom = 28.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = if (isTablet) 20.dp else 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.search),
-                            contentDescription = "Search",
-                            modifier = Modifier.size(if (isTablet) 20.dp else 18.dp)
-                        )
-
-                        BasicTextField(
-                            value = searchState.searchText,
-                            onValueChange = searchViewModel::onSearchTextChange,
-                            textStyle = TextStyle(
-                                fontSize = if (isTablet) 18.sp else 16.sp,
-                                color = Color.White
-                            ),
-                            singleLine = true,
+                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = if (isTablet) 12.dp else 8.dp)
-                                .onFocusChanged { focusState ->
-                                    searchViewModel.onSearchFocusChange(focusState.isFocused)
-                                },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(
-                                onSearch = {
-                                    searchViewModel.performSearch(viewModel::searchCoffee)
-                                    keyboardController?.hide()
-                                    focusManager.clearFocus()
+                                .fillMaxWidth()
+                                .clickable { locationViewModel.onShowAddressDialogChange(true) },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = colorDarkOrange,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Локация", fontFamily = SoraFontFamily, fontSize = 12.sp, color = colorGrey)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = locationState.selectedAddress,
+                                        fontFamily = SoraFontFamily,
+                                        fontWeight = FontWeight.W600,
+                                        fontSize = 14.sp,
+                                        color = colorGreyWhite,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Image(painterResource(R.drawable.img), contentDescription = null, modifier = Modifier.size(14.dp))
                                 }
-                            ),
-                            decorationBox = { innerTextField ->
+                            }
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                                    .background(Color(0xFF2C2C2C), RoundedCornerShape(12.dp))
+                                    .border(
+                                        1.dp,
+                                        if (searchState.isSearchFocused) colorDarkOrange else Color.Transparent,
+                                        RoundedCornerShape(12.dp)
+                                    )
+                            ) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        if (searchState.searchText.isEmpty()) {
-                                            Text(
-                                                text = "Search coffee",
-                                                fontSize = if (isTablet) 18.sp else 16.sp,
-                                                color = Color.Gray
-                                            )
+                                    Image(painterResource(R.drawable.search), contentDescription = null, modifier = Modifier.size(18.dp))
+                                    BasicTextField(
+                                        value = searchState.searchText,
+                                        onValueChange = searchViewModel::onSearchTextChange,
+                                        textStyle = TextStyle(fontSize = 16.sp, color = Color.White, fontFamily = SoraFontFamily),
+                                        singleLine = true,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 8.dp)
+                                            .onFocusChanged { searchViewModel.onSearchFocusChange(it.isFocused) },
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                        keyboardActions = KeyboardActions(onSearch = {
+                                            searchViewModel.performSearch(viewModel::searchCoffee)
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                        }),
+                                        decorationBox = { innerTextField ->
+                                            Box {
+                                                if (searchState.searchText.isEmpty()) {
+                                                    Text("Поиск товаров...", fontSize = 16.sp, color = Color.Gray, fontFamily = SoraFontFamily)
+                                                }
+                                                innerTextField()
+                                            }
                                         }
-                                        innerTextField()
-                                    }
-
+                                    )
                                     if (searchState.searchText.isNotEmpty()) {
                                         IconButton(
                                             onClick = {
@@ -470,110 +227,232 @@ fun FirstHalfOfHomeScreen(viewModel: HomeViewModel) {
                                                 viewModel.searchCoffee("")
                                                 keyboardController?.hide()
                                             },
-                                            modifier = Modifier.size(if (isTablet) 28.dp else 24.dp)
+                                            modifier = Modifier.size(24.dp)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Clear",
-                                                tint = Color.Gray
-                                            )
+                                            Icon(Icons.Default.Close, null, tint = Color.Gray)
                                         }
                                     }
                                 }
                             }
-                        )
-                    }
-                }
-
-
-                Box(
-                    modifier = Modifier
-                        .size(if (isTablet) 56.dp else 52.dp)
-                        .background(colorDarkOrange, RoundedCornerShape(if (isTablet) 14.dp else 12.dp))
-                        .clickable {
-                            searchViewModel.performSearch(viewModel::searchCoffee)
-                            keyboardController?.hide()
-                            focusManager.clearFocus()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.search),
-                        contentDescription = "Search",
-                        modifier = Modifier.size(if (isTablet) 26.dp else 24.dp),
-                        colorFilter = ColorFilter.tint(Color.White)
-                    )
-                }
-            }
-
-            if (searchState.isSearchFocused && searchState.searchText.isEmpty()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = if (isTablet) 12.dp else 8.dp),
-                    shape = RoundedCornerShape(if (isTablet) 14.dp else 12.dp),
-                    color = Color(0xFF2C2C2C),
-                    tonalElevation = 4.dp
-                ) {
-                    Column {
-                        if (searchState.searchHistory.isNotEmpty()) {
-                            Row(
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { searchViewModel.clearSearchHistory() }
-                                    .padding(if (isTablet) 12.dp else 8.dp),
-                                horizontalArrangement = Arrangement.End
+                                    .size(52.dp)
+                                    .background(colorDarkOrange, RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        searchViewModel.performSearch(viewModel::searchCoffee)
+                                        keyboardController?.hide()
+                                        focusManager.clearFocus()
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "Clear history",
-                                    color = Color.Gray,
-                                    fontSize = if (isTablet) 16.sp else 14.sp
-                                )
+                                Image(painterResource(R.drawable.search), contentDescription = null, modifier = Modifier.size(24.dp), colorFilter = ColorFilter.tint(Color.White))
                             }
-
-                            LazyColumn {
-                                items(searchState.searchHistory) { item ->
-                                    Text(
-                                        text = item,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                searchViewModel.selectSearchHistoryItem(item, viewModel::searchCoffee)
-                                                keyboardController?.hide()
-                                                focusManager.clearFocus()
-                                            }
-                                            .padding(if (isTablet) 16.dp else 12.dp),
-                                        color = Color.White,
-                                        fontSize = if (isTablet) 18.sp else 16.sp
-                                    )
-
-                                    if (item != searchState.searchHistory.last()) {
-                                        Divider(
-                                            color = Color(0xFF3A3A3A),
-                                            thickness = 1.dp,
-                                            modifier = Modifier.padding(horizontal = if (isTablet) 12.dp else 8.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            Text(
-                                text = "No search history",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(if (isTablet) 16.dp else 12.dp),
-                                color = Color.Gray,
-                                fontSize = if (isTablet) 18.sp else 16.sp
-                            )
                         }
                     }
                 }
             }
+
+            // ── История поиска ─────────────────────────────────────────────────
+            if (searchState.isSearchFocused && searchState.searchText.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF2C2C2C),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp)
+                    ) {
+                        Column {
+                            if (searchState.searchHistory.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { searchViewModel.clearSearchHistory() }.padding(8.dp),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Text("Очистить историю", color = Color.Gray, fontSize = 14.sp, fontFamily = SoraFontFamily)
+                                }
+                                searchState.searchHistory.forEachIndexed { index, item ->
+                                    Text(
+                                        text = item,
+                                        modifier = Modifier.fillMaxWidth().clickable {
+                                            searchViewModel.selectSearchHistoryItem(item, viewModel::searchCoffee)
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                        }.padding(12.dp),
+                                        color = Color.White,
+                                        fontFamily = SoraFontFamily,
+                                        fontSize = 16.sp
+                                    )
+                                    if (index < searchState.searchHistory.lastIndex) {
+                                        Divider(color = Color(0xFF3A3A3A))
+                                    }
+                                }
+                            } else {
+                                Text("Нет истории поиска", modifier = Modifier.padding(12.dp), color = Color.Gray, fontFamily = SoraFontFamily, fontSize = 14.sp)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Категории ──────────────────────────────────────────────────────
+            if (homeState.productTypes.isNotEmpty()) {
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    ) {
+                        items(homeState.productTypes) { category ->
+                            val isSelected = category == homeState.selectedTypeName
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isSelected) colorDarkOrange else MaterialTheme.colorScheme.surface,
+                                shadowElevation = 1.dp,
+                                modifier = Modifier.clickable { viewModel.onCoffeeTypeSelected(category) }
+                            ) {
+                                Text(
+                                    text = category,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    fontFamily = SoraFontFamily,
+                                    fontWeight = if (isSelected) FontWeight.W600 else FontWeight.W400,
+                                    fontSize = 13.sp,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Магазины ───────────────────────────────────────────────────────
+            if (showSections && sellers.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                        Text(
+                            text = "Магазины",
+                            fontFamily = SoraFontFamily,
+                            fontWeight = FontWeight.W600,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
+                        )
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(sellers) { seller ->
+                                SellerChipCard(seller = seller, onClick = {
+                                    navController.navigate("${NavigationRoutes.SELLER_STORE}/${seller.id}")
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Популярное ────────────────────────────────────────────────────
+            if (showSections && popularProducts.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)) {
+                        Text(
+                            text = "Популярное",
+                            fontFamily = SoraFontFamily,
+                            fontWeight = FontWeight.W600,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
+                        )
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(popularProducts) { product ->
+                                PopularProductCard(
+                                    product = product,
+                                    viewModel = viewModel,
+                                    navController = navController,
+                                    cartViewModel = cartViewModel
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Заголовок раздела товаров ──────────────────────────────────────
+            item {
+                Text(
+                    text = if (showSections) "Все товары" else homeState.selectedTypeName,
+                    fontFamily = SoraFontFamily,
+                    fontWeight = FontWeight.W600,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp)
+                )
+            }
+
+            // ── Список товаров ─────────────────────────────────────────────────
+            if (isLoading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = colorDarkOrange)
+                    }
+                }
+            } else if (error != null) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(error ?: "", color = MaterialTheme.colorScheme.onBackground, fontFamily = SoraFontFamily, fontSize = 14.sp)
+                        TextButton(onClick = { viewModel.loadCoffeeData() }) {
+                            Text("Повторить", color = colorDarkOrange, fontFamily = SoraFontFamily)
+                        }
+                    }
+                }
+            } else if (homeState.filteredProducts.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        Text("Товары не найдены", color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = SoraFontFamily)
+                    }
+                }
+            } else {
+                items(homeState.filteredProducts.chunked(2)) { pair ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(15.dp)
+                    ) {
+                        pair.forEach { coffee ->
+                            ProductCard(
+                                coffee = coffee,
+                                viewModel = viewModel,
+                                navController = navController,
+                                cartViewModel = cartViewModel,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(120.dp)) }
+        }
+
+        // ── Диалог выбора размера ──────────────────────────────────────────────
+        showSizeDialog?.let { coffee ->
+            SizeSelectionDialog(
+                coffee = coffee,
+                onDismiss = { viewModel.hideSizeSelectionDialog() },
+                onSizeSelected = { selectedSize -> cartViewModel.addToCart(coffee.id, selectedSize) }
+            )
         }
     }
 
-
     if (locationState.showAddressDialog) {
+        val configuration = LocalConfiguration.current
+        val screenHeight = configuration.screenHeightDp.dp
+        val isTablet = configuration.screenWidthDp >= 600
         AddressSelectionDialog(
             currentAddress = locationState.selectedAddress,
             searchQuery = locationState.addressSearchQuery,
@@ -587,6 +466,113 @@ fun FirstHalfOfHomeScreen(viewModel: HomeViewModel) {
         )
     }
 }
+
+@Composable
+fun PopularProductCard(
+    product: ProductResponse,
+    viewModel: HomeViewModel,
+    navController: NavController,
+    cartViewModel: CartViewModel
+) {
+    val imageBytes by viewModel.imageCache[product.imageName]
+        ?.let { bytes -> remember(bytes) { mutableStateOf(bytes) } }
+        ?: remember { mutableStateOf<ByteArray?>(null) }
+
+    val imagePainter = rememberAsyncImagePainter(
+        model = ImageRequest.Builder(LocalContext.current).data(imageBytes).build()
+    )
+
+    val defaultPrice = remember(product) { viewModel.getDefaultPrice(product) }
+
+    val isInCart by remember(cartViewModel.cartItems, product.id) {
+        derivedStateOf { cartViewModel.cartItems.value.any { it.id == product.id } }
+    }
+
+    Surface(
+        modifier = Modifier
+            .width(150.dp)
+            .clickable {
+                val sizesEncoded = viewModel.encodeSizesForNavigation(product)
+                navController.navigate(
+                    "${NavigationRoutes.DETAIL}/${product.id}/${product.name}/${product.type.type}/${product.description}/${product.imageName}?sizes=$sizesEncoded&favoriteSize=&sellerId=${product.sellerId ?: -1L}"
+                )
+            },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp)
+                    .clip(RoundedCornerShape(12.dp))
+            ) {
+                Image(
+                    painter = imagePainter,
+                    contentDescription = product.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Text(
+                product.name,
+                fontFamily = SoraFontFamily,
+                fontWeight = FontWeight.W600,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                product.type.type,
+                fontFamily = SoraFontFamily,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "от ₽${defaultPrice.toInt()}",
+                    fontFamily = SoraFontFamily,
+                    fontWeight = FontWeight.W600,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(
+                            if (isInCart) Color.White else colorDarkOrange,
+                            RoundedCornerShape(6.dp)
+                        )
+                        .border(
+                            if (isInCart) 1.5.dp else 0.dp,
+                            if (isInCart) colorDarkOrange else Color.Transparent,
+                            RoundedCornerShape(6.dp)
+                        )
+                        .clickable { viewModel.showSizeSelectionDialog(product) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isInCart) {
+                        Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(14.dp), tint = colorDarkOrange)
+                    } else {
+                        Text("+", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Normal)
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
 
 
 @Composable
