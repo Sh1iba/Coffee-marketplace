@@ -92,7 +92,7 @@ class FavoriteCoffeeViewModel @Inject constructor(
 
     fun encodeSizesForNavigation(coffee: ProductResponse): String {
         return URLEncoder.encode(
-            coffee.sizes.joinToString(",") { "${it.size}:${it.price}" },
+            coffee.sizes.joinToString(",") { "${it.size}:${it.price}:${it.volume ?: ""}" },
             "UTF-8"
         )
     }

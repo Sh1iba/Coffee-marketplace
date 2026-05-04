@@ -80,7 +80,7 @@ class HomeViewModel @Inject constructor(
 
     internal fun encodeSizesForNavigation(product: ProductResponse): String {
         return URLEncoder.encode(
-            product.sizes.joinToString(",") { "${it.size}:${it.price}" },
+            product.sizes.joinToString(",") { "${it.size}:${it.price}:${it.volume ?: ""}" },
             "UTF-8"
         )
     }

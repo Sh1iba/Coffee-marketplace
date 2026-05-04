@@ -75,7 +75,11 @@ fun AppNavGraph(
             val sizes = if (sizesEncoded.isEmpty()) emptyList() else try {
                 URLDecoder.decode(sizesEncoded, "UTF-8").split(",").mapNotNull { sp ->
                     val p = sp.split(":")
-                    if (p.size == 2) ProductVariantResponse(size = p[0], price = p[1].toFloatOrNull() ?: 0f) else null
+                    if (p.size >= 2) ProductVariantResponse(
+                        size = p[0],
+                        price = p[1].toFloatOrNull() ?: 0f,
+                        volume = p.getOrNull(2)?.takeIf { it.isNotBlank() }
+                    ) else null
                 }
             } catch (_: Exception) { emptyList() }
 

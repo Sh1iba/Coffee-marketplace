@@ -271,7 +271,7 @@ fun SellerStoreScreen(navController: NavController, sellerId: Long) {
                             imageBytes = imageCache[coffee.imageName],
                             onClick = {
                                 val sizesEncoded = URLEncoder.encode(
-                                    coffee.sizes.joinToString(",") { "${it.size}:${it.price}" },
+                                    coffee.sizes.joinToString(",") { "${it.size}:${it.price}:${it.volume ?: ""}" },
                                     "UTF-8"
                                 )
                                 navController.navigate(

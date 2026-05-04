@@ -386,6 +386,7 @@ fun CoffeeDetailScreen(
                     availableSizes.forEach { size ->
                         SizeOption(
                             size = size.size,
+                            volume = size.volume,
                             isSelected = selectedSize == size.size,
                             onClick = { viewModel.selectSize(size.size) }
                         )
@@ -399,6 +400,7 @@ fun CoffeeDetailScreen(
 @Composable
 fun SizeOption(
     size: String,
+    volume: String? = null,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -422,7 +424,7 @@ fun SizeOption(
 
     Box(
         modifier = Modifier
-            .height(44.dp)
+            .height(if (volume != null) 56.dp else 44.dp)
             .width(100.dp)
             .clip(RoundedCornerShape(12.dp))
             .border(
@@ -434,12 +436,25 @@ fun SizeOption(
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = size,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.W600,
-            color = textColor
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = size,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.W600,
+                color = textColor
+            )
+            if (volume != null) {
+                Text(
+                    text = volume,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.W400,
+                    color = textColor.copy(alpha = 0.7f)
+                )
+            }
+        }
     }
 }
 

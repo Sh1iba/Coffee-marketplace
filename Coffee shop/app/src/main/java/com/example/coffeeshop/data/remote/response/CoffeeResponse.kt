@@ -15,5 +15,6 @@ data class ProductResponse(
 
 data class ProductVariantResponse(
     val size: String,
-    val price: Float
+    val price: Float,
+    val volume: String? = null
 )
