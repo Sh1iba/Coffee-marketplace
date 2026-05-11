@@ -157,6 +157,11 @@ fun AppNavGraph(
             SellerStoreScreen(navController = navController, sellerId = id)
         }
 
+        // ── Admin ───────────────────────────────────────────────────────────
+        composable(NavigationRoutes.ADMIN_DASHBOARD) {
+            AdminDashboardScreen(navController)
+        }
+
         // ── Legacy routes (kept for back-compat) ───────────────────────────
         composable(
             route = "${NavigationRoutes.ACTIVE_ORDER}/{orderId}",

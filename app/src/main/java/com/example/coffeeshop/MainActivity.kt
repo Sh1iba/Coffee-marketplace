@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                 prefsManager.setFirstLaunchCompleted()
                 NavigationRoutes.ONBOARDING
             }
+            prefsManager.isLoggedIn() && prefsManager.getRole() == "ADMIN" -> NavigationRoutes.ADMIN_DASHBOARD
             prefsManager.isLoggedIn() -> NavigationRoutes.HOME
             else -> NavigationRoutes.SIGN_IN
         }

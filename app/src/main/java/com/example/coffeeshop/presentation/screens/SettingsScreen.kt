@@ -209,6 +209,7 @@ private fun SettingsOptionsSection(
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     val isSeller by viewModel.isSeller.collectAsState()
+    val shopStatus by viewModel.shopStatus.collectAsState()
 
     // Уведомления
     SettingsItem(
@@ -254,15 +255,26 @@ private fun SettingsOptionsSection(
         }
     )
 
-    if (isSeller) {
-        SettingsItem(
+    when {
+        isSeller && shopStatus == "APPROVED" -> SettingsItem(
             title = "Панель продавца",
             subtitle = "Управление магазином и товарами",
             leadingIcon = Icons.TwoTone.ShoppingCart,
             onClick = { navController.navigate(NavigationRoutes.SELLER_DASHBOARD) }
         )
-    } else {
-        SettingsItem(
+        isSeller && shopStatus == "PENDING" -> SettingsItem(
+            title = "Стать продавцом",
+            subtitle = "Заявка на рассмотрении...",
+            leadingIcon = Icons.TwoTone.ShoppingCart,
+            onClick = { navController.navigate(NavigationRoutes.SELLER_DASHBOARD) }
+        )
+        isSeller && shopStatus == "REJECTED" -> SettingsItem(
+            title = "Стать продавцом",
+            subtitle = "Заявка отклонена — нажмите чтобы подать заново",
+            leadingIcon = Icons.TwoTone.ShoppingCart,
+            onClick = { navController.navigate(NavigationRoutes.SELLER_DASHBOARD) }
+        )
+        else -> SettingsItem(
             title = "Стать продавцом",
             subtitle = "Откройте свой магазин на платформе",
             leadingIcon = Icons.TwoTone.ShoppingCart,

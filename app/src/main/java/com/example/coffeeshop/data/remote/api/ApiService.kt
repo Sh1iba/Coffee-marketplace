@@ -1,6 +1,9 @@
 package com.example.coffeeshop.data.remote.api
 
+import com.example.coffeeshop.data.remote.response.AdminCourierResponse
+import com.example.coffeeshop.data.remote.response.AdminUserResponse
 import com.example.coffeeshop.data.remote.response.ApiResponse
+import com.example.coffeeshop.data.remote.response.BranchResponse
 import com.example.coffeeshop.data.remote.response.CartSummaryResponse
 import com.example.coffeeshop.data.remote.response.CreateOrderResponse
 import com.example.coffeeshop.data.remote.response.ProductResponse
@@ -12,7 +15,10 @@ import com.example.coffeeshop.data.remote.response.PagedProductResponse
 import com.example.coffeeshop.data.remote.response.RegisterResponse
 import com.example.coffeeshop.data.remote.response.SellerOrderResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
+import com.example.coffeeshop.domain.BranchRequest
 import com.example.coffeeshop.domain.CartItemRequest
+import com.example.coffeeshop.domain.RejectSellerRequest
+import com.example.coffeeshop.domain.RoleChangeRequest
 import com.example.coffeeshop.domain.FavoriteProductRequest
 import com.example.coffeeshop.domain.LoginRequest
 import com.example.coffeeshop.domain.OrderRequest
@@ -129,6 +135,9 @@ interface ApiService {
     @PUT("sellers/me")
     suspend fun updateMyShop(@Body request: SellerRequest): Response<SellerResponse>
 
+    @PUT("sellers/me/resubmit")
+    suspend fun resubmitShop(@Body request: SellerRequest): Response<SellerResponse>
+
     @GET("sellers/me/products")
     suspend fun getMyProducts(): Response<List<ProductResponse>>
 
@@ -157,6 +166,23 @@ interface ApiService {
     @POST("sellers/me/upload-image")
     suspend fun uploadProductImage(@Part file: MultipartBody.Part): Response<Map<String, String>>
 
+    // ── BRANCHES ───────────────────────────────────────────────────────────
+
+    @GET("sellers/{id}/branches")
+    suspend fun getBranchesBySeller(@Path("id") sellerId: Long): Response<List<BranchResponse>>
+
+    @GET("sellers/me/branches")
+    suspend fun getMyBranches(): Response<List<BranchResponse>>
+
+    @POST("sellers/me/branches")
+    suspend fun createBranch(@Body request: BranchRequest): Response<BranchResponse>
+
+    @PUT("sellers/me/branches/{branchId}")
+    suspend fun updateBranch(@Path("branchId") branchId: Long, @Body request: BranchRequest): Response<BranchResponse>
+
+    @PUT("sellers/me/branches/{branchId}/toggle")
+    suspend fun toggleBranch(@Path("branchId") branchId: Long): Response<BranchResponse>
+
     // ── PROFILE ────────────────────────────────────────────────────────────
 
     @GET("profile")
@@ -164,4 +190,45 @@ interface ApiService {
 
     @PUT("profile")
     suspend fun updateProfile(@Body request: UpdateProfileRequest): Response<LoginResponse>
+
+    // ── ADMIN ──────────────────────────────────────────────────────────────
+
+    @GET("admin/users")
+    suspend fun getAdminUsers(): Response<List<AdminUserResponse>>
+
+    @PUT("admin/users/{userId}/role")
+    suspend fun changeUserRole(
+        @Path("userId") userId: Long,
+        @Body request: RoleChangeRequest
+    ): Response<ApiResponse>
+
+    @GET("admin/sellers")
+    suspend fun getAdminAllSellers(): Response<List<SellerResponse>>
+
+    @GET("admin/sellers/pending")
+    suspend fun getAdminPendingSellers(): Response<List<SellerResponse>>
+
+    @PUT("admin/sellers/{sellerId}/approve")
+    suspend fun approveSeller(@Path("sellerId") sellerId: Long): Response<ApiResponse>
+
+    @PUT("admin/sellers/{sellerId}/reject")
+    suspend fun rejectSeller(
+        @Path("sellerId") sellerId: Long,
+        @Body request: RejectSellerRequest
+    ): Response<ApiResponse>
+
+    @PUT("admin/sellers/{sellerId}/activate")
+    suspend fun activateSeller(@Path("sellerId") sellerId: Long): Response<ApiResponse>
+
+    @PUT("admin/sellers/{sellerId}/deactivate")
+    suspend fun deactivateSeller(@Path("sellerId") sellerId: Long): Response<ApiResponse>
+
+    @GET("admin/couriers")
+    suspend fun getAdminCouriers(): Response<List<AdminCourierResponse>>
+
+    @PUT("admin/couriers/{courierId}/toggle")
+    suspend fun toggleCourier(@Path("courierId") courierId: Long): Response<ApiResponse>
+
+    @DELETE("admin/couriers/{courierId}")
+    suspend fun removeCourier(@Path("courierId") courierId: Long): Response<ApiResponse>
 }

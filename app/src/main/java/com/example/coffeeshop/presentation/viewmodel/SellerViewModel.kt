@@ -2,11 +2,14 @@ package com.example.coffeeshop.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.coffeeshop.data.remote.response.BranchResponse
 import com.example.coffeeshop.data.remote.response.ProductCategoryResponse
 import com.example.coffeeshop.data.remote.response.ProductResponse
 import com.example.coffeeshop.data.remote.response.SellerOrderResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
+import com.example.coffeeshop.data.repository.BranchRepository
 import com.example.coffeeshop.data.repository.SellerRepository
+import com.example.coffeeshop.domain.BranchRequest
 import com.example.coffeeshop.domain.ProductManageRequest
 import com.example.coffeeshop.domain.SellerRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +21,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SellerViewModel @Inject constructor(
-    private val sellerRepository: SellerRepository
+    private val sellerRepository: SellerRepository,
+    private val branchRepository: BranchRepository
 ) : ViewModel() {
 
     private val _myShop = MutableStateFlow<SellerResponse?>(null)
@@ -29,6 +33,9 @@ class SellerViewModel @Inject constructor(
 
     private val _myOrders = MutableStateFlow<List<SellerOrderResponse>>(emptyList())
     val myOrders: StateFlow<List<SellerOrderResponse>> = _myOrders
+
+    private val _myBranches = MutableStateFlow<List<BranchResponse>>(emptyList())
+    val myBranches: StateFlow<List<BranchResponse>> = _myBranches
 
     private val _categories = MutableStateFlow<List<ProductCategoryResponse>>(emptyList())
     val categories: StateFlow<List<ProductCategoryResponse>> = _categories
@@ -63,6 +70,45 @@ class SellerViewModel @Inject constructor(
     fun loadMyOrders() {
         viewModelScope.launch {
             _myOrders.value = sellerRepository.getMySellerOrders()
+        }
+    }
+
+    fun loadMyBranches() {
+        viewModelScope.launch {
+            _myBranches.value = branchRepository.getMyBranches()
+        }
+    }
+
+    fun createBranch(request: BranchRequest) {
+        viewModelScope.launch {
+            val result = branchRepository.createBranch(request)
+            if (result != null) {
+                _myBranches.value = _myBranches.value + result
+            } else {
+                _error.value = "Не удалось создать филиал"
+            }
+        }
+    }
+
+    fun updateBranch(branchId: Long, request: BranchRequest) {
+        viewModelScope.launch {
+            val result = branchRepository.updateBranch(branchId, request)
+            if (result != null) {
+                _myBranches.value = _myBranches.value.map { if (it.id == branchId) result else it }
+            } else {
+                _error.value = "Не удалось обновить филиал"
+            }
+        }
+    }
+
+    fun toggleBranch(branchId: Long) {
+        viewModelScope.launch {
+            val result = branchRepository.toggleBranch(branchId)
+            if (result != null) {
+                _myBranches.value = _myBranches.value.map { if (it.id == branchId) result else it }
+            } else {
+                _error.value = "Не удалось изменить статус филиала"
+            }
         }
     }
 
@@ -102,6 +148,20 @@ class SellerViewModel @Inject constructor(
                 onSuccess()
             } else {
                 _error.value = "Не удалось обновить магазин"
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun resubmitShop(request: SellerRequest, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val result = sellerRepository.resubmitShop(request)
+            if (result != null) {
+                _myShop.value = result
+                onSuccess()
+            } else {
+                _error.value = "Не удалось отправить заявку повторно"
             }
             _isLoading.value = false
         }

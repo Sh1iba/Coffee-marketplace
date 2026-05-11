@@ -7,7 +7,11 @@ data class OrderResponse(
     val id: Long,
     val totalAmount: BigDecimal,
     val deliveryFee: BigDecimal,
-    val deliveryAddress: String,
+    val deliveryAddress: String?,
+    val branchId: Long?,
+    val branchName: String?,
+    val courierId: Long?,
+    val deliveryType: String = "DELIVERY",
     val orderDate: String,
     val status: String = "PENDING",
     val items: List<OrderItemResponse>

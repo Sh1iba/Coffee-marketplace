@@ -39,10 +39,6 @@ class RegistrationViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showSuccessDialog = show)
     }
 
-    fun onRoleChange(isSeller: Boolean) {
-        _uiState.value = _uiState.value.copy(isSeller = isSeller)
-    }
-
     fun register() {
         val state = _uiState.value
         if (state.name.isEmpty() || state.email.isEmpty() || state.password.isEmpty()) {
@@ -50,9 +46,8 @@ class RegistrationViewModel @Inject constructor(
             return
         }
         _uiState.value = state.copy(isLoading = true, errorMessage = null)
-        val role = if (state.isSeller) "SELLER" else "BUYER"
         viewModelScope.launch {
-            when (val result = authRepository.register(state.email, state.password, state.name, role)) {
+            when (val result = authRepository.register(state.email, state.password, state.name, "BUYER")) {
                 is AuthResult.Success -> _uiState.value = state.copy(isLoading = false, showSuccessDialog = true)
                 is AuthResult.Error -> _uiState.value = state.copy(isLoading = false, errorMessage = result.message)
             }
@@ -70,7 +65,6 @@ data class RegistrationState(
     val password: String = "",
     val isPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
-    val isSeller: Boolean = false,
     val errorMessage: String? = null,
     val showSuccessDialog: Boolean = false
 )

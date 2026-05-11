@@ -4,8 +4,10 @@ import com.google.gson.annotations.SerializedName
 import java.math.BigDecimal
 
 data class OrderRequest(
-    val deliveryAddress: String,
+    val branchId: Long? = null,
+    val deliveryAddress: String? = null,
     val deliveryFee: BigDecimal = BigDecimal.ZERO,
+    val deliveryType: String = "DELIVERY",
     val items: List<OrderCartItem>
 )
 

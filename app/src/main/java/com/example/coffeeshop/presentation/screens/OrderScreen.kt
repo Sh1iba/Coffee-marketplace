@@ -85,6 +85,7 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import com.example.coffeeshop.data.remote.response.BranchResponse
 import com.example.coffeeshop.data.remote.response.CartItemResponse
 import com.example.coffeeshop.data.remote.response.ProductResponse
 import com.example.coffeeshop.data.remote.response.ProductVariantResponse
@@ -130,11 +131,14 @@ fun OrderScreen(
     val addressNote by viewModel.addressNote.collectAsState()
     val showNoteDialog by viewModel.showNoteDialog.collectAsState()
     val navigateToOrders by viewModel.navigateToOrders.collectAsState()
+    val branches by viewModel.branches.collectAsState()
+    val selectedBranch by viewModel.selectedBranch.collectAsState()
 
     val locationState by locationViewModel.uiState.collectAsState()
 
     var selectedButton by remember { mutableStateOf("Доставка") }
     var showAddressConfirmationDialog by remember { mutableStateOf(false) }
+    var showBranchPickerDialog by remember { mutableStateOf(false) }
     var tempOrderData by remember { mutableStateOf<OrderData?>(null) }
 
     LaunchedEffect(navigateToOrders) {
@@ -146,13 +150,16 @@ fun OrderScreen(
         }
     }
 
+    LaunchedEffect(selectedButton) {
+        viewModel.setDeliveryType(if (selectedButton == "Доставка") "DELIVERY" else "PICKUP")
+    }
+
     LaunchedEffect(locationState.selectedAddress) {
         if (locationState.selectedAddress.isNotEmpty()) {
             viewModel.loadAddressNote(locationState.selectedAddress)
             selectedButton = "Доставка"
         } else {
             viewModel.clearAddressNote("")
-            selectedButton = "Забрать"
         }
     }
 
@@ -187,6 +194,18 @@ fun OrderScreen(
                 showAddressConfirmationDialog = false
                 tempOrderData = null
             }
+        )
+    }
+
+    if (showBranchPickerDialog && branches.isNotEmpty()) {
+        BranchPickerDialog(
+            branches = branches,
+            selected = selectedBranch,
+            onSelect = { branch ->
+                viewModel.selectBranch(branch)
+                showBranchPickerDialog = false
+            },
+            onDismiss = { showBranchPickerDialog = false }
         )
     }
 
@@ -312,9 +331,12 @@ fun OrderScreen(
                         addressNote = addressNote,
                         parsedAddress = viewModel.parseAddress(locationState.selectedAddress),
                         selectedButton = selectedButton,
+                        selectedBranch = selectedBranch,
+                        hasBranches = branches.isNotEmpty(),
                         onLocationClick = { locationViewModel.onShowAddressDialogChange(true) },
                         onNoteClick = { viewModel.showNoteDialog() },
-                        onSelectedButtonChange = { newButton -> selectedButton = newButton }
+                        onSelectedButtonChange = { newButton -> selectedButton = newButton },
+                        onBranchClick = { showBranchPickerDialog = true }
                     )
                 }
             }
@@ -403,9 +425,12 @@ fun OrderContent(
     addressNote: String,
     parsedAddress: ParsedAddress,
     selectedButton: String,
+    selectedBranch: BranchResponse?,
+    hasBranches: Boolean,
     onLocationClick: () -> Unit,
     onNoteClick: () -> Unit,
-    onSelectedButtonChange: (String) -> Unit
+    onSelectedButtonChange: (String) -> Unit,
+    onBranchClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -472,11 +497,20 @@ fun OrderContent(
             }
         }
 
+        if (hasBranches) {
+            BranchPickerSection(
+                selectedBranch = selectedBranch,
+                deliveryType = selectedButton,
+                onBranchClick = onBranchClick,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
-                .padding(top = 24.dp)
+                .padding(top = 8.dp)
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -990,6 +1024,135 @@ fun OrderCoffeeCard(
             }
         }
     }
+}
+
+@Composable
+fun BranchPickerSection(
+    selectedBranch: BranchResponse?,
+    deliveryType: String,
+    onBranchClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val label = if (deliveryType == "Доставка") "Откуда доставить" else "Куда приехать"
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable { onBranchClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                fontFamily = SoraFontFamily,
+                fontSize = 12.sp,
+                color = colorLightGrey
+            )
+            Text(
+                text = selectedBranch?.name ?: "Выберите филиал",
+                fontFamily = SoraFontFamily,
+                fontWeight = FontWeight.W600,
+                fontSize = 14.sp,
+                color = if (selectedBranch != null) MaterialTheme.colorScheme.onBackground else colorDarkOrange
+            )
+            if (selectedBranch != null) {
+                Text(
+                    text = selectedBranch.address,
+                    fontFamily = SoraFontFamily,
+                    fontSize = 12.sp,
+                    color = colorLightGrey,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Icon(
+            painter = painterResource(id = R.drawable.edit),
+            contentDescription = null,
+            tint = colorDarkOrange,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+fun BranchPickerDialog(
+    branches: List<BranchResponse>,
+    selected: BranchResponse?,
+    onSelect: (BranchResponse) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Выберите филиал",
+                fontFamily = SoraFontFamily,
+                fontWeight = FontWeight.W600,
+                fontSize = 18.sp
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                branches.forEach { branch ->
+                    val isSelected = branch.id == selected?.id
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) colorDarkOrange.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface)
+                            .clickable { onSelect(branch) }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = branch.name,
+                                fontFamily = SoraFontFamily,
+                                fontWeight = FontWeight.W600,
+                                fontSize = 14.sp,
+                                color = if (isSelected) colorDarkOrange else MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = branch.address,
+                                fontFamily = SoraFontFamily,
+                                fontSize = 12.sp,
+                                color = colorLightGrey,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (branch.workingHours != null) {
+                                Text(
+                                    text = branch.workingHours,
+                                    fontFamily = SoraFontFamily,
+                                    fontSize = 11.sp,
+                                    color = colorDarkOrange
+                                )
+                            }
+                        }
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                tint = colorDarkOrange,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Закрыть", color = colorLightGrey)
+            }
+        }
+    )
 }
 
 @Preview(showBackground = true, showSystemUi = true, name = "OrderScreenPreview")

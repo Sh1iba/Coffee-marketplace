@@ -267,11 +267,11 @@ private fun ActiveOrderTrackingCard(
             StepProgress(status = order.status)
 
             // ── Address ──────────────────────────────────────────────────────
-            if (order.deliveryAddress.isNotBlank()) {
+            if (!order.deliveryAddress.isNullOrBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(Icons.Default.LocationOn, null, tint = colorLightGrey, modifier = Modifier.size(13.dp))
                     Text(
-                        order.deliveryAddress,
+                        order.deliveryAddress ?: "",
                         fontFamily = SoraFontFamily,
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

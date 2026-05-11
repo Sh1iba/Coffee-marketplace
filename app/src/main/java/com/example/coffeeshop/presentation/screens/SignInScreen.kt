@@ -77,7 +77,12 @@ fun SignInScreen(navController: NavController) {
 
         LaunchedEffect(state.isLoginSuccess) {
             if (state.isLoginSuccess) {
-                navController.navigate(NavigationRoutes.HOME) {
+                val destination = if (state.loggedInRole == "ADMIN") {
+                    NavigationRoutes.ADMIN_DASHBOARD
+                } else {
+                    NavigationRoutes.HOME
+                }
+                navController.navigate(destination) {
                     popUpTo(NavigationRoutes.SIGN_IN) { inclusive = true }
                 }
             }

@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private val ACTIVE_STATUSES = setOf("PENDING", "CONFIRMED", "PROCESSING", "READY")
+private val ACTIVE_STATUSES = setOf("PENDING", "CONFIRMED", "COOKING", "READY_FOR_PICKUP", "PICKED_UP", "DELIVERING")
 
 @HiltViewModel
 class OrderHistoryViewModel @Inject constructor(

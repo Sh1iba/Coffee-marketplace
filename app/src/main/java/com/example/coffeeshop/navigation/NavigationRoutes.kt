@@ -17,4 +17,5 @@ object NavigationRoutes {
     const val SELLER_DASHBOARD = "seller_dashboard"
     const val SELLER_STORE = "seller_store"
     const val BECOME_SELLER = "become_seller"
+    const val ADMIN_DASHBOARD = "admin_dashboard"
 }

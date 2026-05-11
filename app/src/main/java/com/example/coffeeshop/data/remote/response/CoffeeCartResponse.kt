@@ -7,7 +7,8 @@ data class CartItemResponse(
     val price: Float,
     val quantity: Int,
     val totalPrice: Float,
-    val imageUrl: String = ""
+    val imageUrl: String = "",
+    val sellerId: Long? = null
 )
 
 data class CartSummaryResponse(

@@ -2,6 +2,7 @@ package com.example.coffeeshop.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.coffeeshop.data.managers.PrefsManager
 import com.example.coffeeshop.data.repository.AuthRepository
 import com.example.coffeeshop.data.repository.AuthResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SignInViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val prefsManager: PrefsManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SignInState())
@@ -40,7 +42,7 @@ class SignInViewModel @Inject constructor(
         _uiState.value = state.copy(isLoading = true, errorMessage = null)
         viewModelScope.launch {
             when (val result = authRepository.login(state.email, state.password)) {
-                is AuthResult.Success -> _uiState.value = state.copy(isLoading = false, isLoginSuccess = true)
+                is AuthResult.Success -> _uiState.value = state.copy(isLoading = false, isLoginSuccess = true, loggedInRole = prefsManager.getRole())
                 is AuthResult.Error -> _uiState.value = state.copy(isLoading = false, errorMessage = result.message)
             }
         }
@@ -57,5 +59,6 @@ data class SignInState(
     val isPasswordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val isLoginSuccess: Boolean = false
+    val isLoginSuccess: Boolean = false,
+    val loggedInRole: String = "BUYER"
 )

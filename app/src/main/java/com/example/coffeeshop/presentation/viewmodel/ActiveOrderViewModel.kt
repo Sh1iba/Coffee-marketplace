@@ -82,21 +82,25 @@ class ActiveOrderViewModel @Inject constructor(
     }
 
     private fun statusToLabel(status: String) = when (status) {
-        "PENDING"    -> "Ожидает подтверждения"
-        "CONFIRMED"  -> "Заказ подтверждён"
-        "PROCESSING" -> "Готовится..."
-        "READY"      -> "Готово! Ожидает курьера"
-        "DELIVERED"  -> "Доставлен!"
-        "CANCELLED"  -> "Заказ отменён"
-        else         -> status
+        "PENDING"            -> "Ожидает подтверждения"
+        "CONFIRMED"          -> "Заказ подтверждён"
+        "COOKING"            -> "Готовится..."
+        "READY_FOR_PICKUP"   -> "Готово! Ожидает курьера"
+        "PICKED_UP"          -> "Курьер забрал заказ"
+        "DELIVERING"         -> "В пути к вам"
+        "DELIVERED"          -> "Доставлен!"
+        "CANCELLED"          -> "Заказ отменён"
+        else                 -> status
     }
 
     private fun statusToProgress(status: String) = when (status) {
-        "PENDING"    -> 0.1f
-        "CONFIRMED"  -> 0.3f
-        "PROCESSING" -> 0.6f
-        "READY"      -> 0.85f
-        "DELIVERED"  -> 1.0f
-        else         -> 0f
+        "PENDING"            -> 0.1f
+        "CONFIRMED"          -> 0.25f
+        "COOKING"            -> 0.45f
+        "READY_FOR_PICKUP"   -> 0.65f
+        "PICKED_UP"          -> 0.75f
+        "DELIVERING"         -> 0.9f
+        "DELIVERED"          -> 1.0f
+        else                 -> 0f
     }
 }

@@ -44,6 +44,11 @@ class SellerRepository @Inject constructor(
         if (r.isSuccessful) r.body() else null
     } catch (e: Exception) { null }
 
+    suspend fun resubmitShop(request: SellerRequest): SellerResponse? = try {
+        val r = apiService.resubmitShop(request)
+        if (r.isSuccessful) r.body() else null
+    } catch (e: Exception) { null }
+
     suspend fun getMyProducts(): List<ProductResponse> = try {
         apiService.getMyProducts().body() ?: emptyList()
     } catch (e: Exception) { emptyList() }
