@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.*
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,31 +74,24 @@ fun SellerDashboardScreen(navController: NavController) {
 
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
+            0 -> { viewModel.loadMyProducts(); viewModel.loadMyBranches() }
             1 -> viewModel.loadMyProducts()
             2 -> viewModel.loadMyOrders()
             3 -> viewModel.loadMyBranches()
         }
     }
 
-    // Модерационный gate — все remember/LaunchedEffect должны быть ДО этих return
-    if (!isLoading && myShop != null) {
-        when (myShop!!.status) {
-            "PENDING" -> {
-                ModerationPendingContent(navController) { viewModel.loadMyShop() }
-                return
-            }
-            "REJECTED" -> {
-                ModerationRejectedContent(
-                    navController = navController,
-                    shop = myShop!!,
-                    isUploading = isUploading,
-                    onUploadImage = { part, cb -> viewModel.uploadImage(part, cb) },
-                    onResubmit = { req -> viewModel.resubmitShop(req) { viewModel.loadMyShop() } },
-                    onRefresh = { viewModel.loadMyShop() }
-                )
-                return
-            }
-        }
+    // Только REJECTED показывает отдельный экран — PENDING теперь показывает полный дашборд
+    if (!isLoading && myShop?.status == "REJECTED") {
+        ModerationRejectedContent(
+            navController = navController,
+            shop = myShop!!,
+            isUploading = isUploading,
+            onUploadImage = { part, cb -> viewModel.uploadImage(part, cb) },
+            onResubmit = { req -> viewModel.resubmitShop(req) { viewModel.loadMyShop() } },
+            onRefresh = { viewModel.loadMyShop() }
+        )
+        return
     }
 
     Scaffold(
@@ -172,7 +166,12 @@ fun SellerDashboardScreen(navController: NavController) {
                 )
             } else {
                 when (selectedTab) {
-                    0 -> ShopTab(myShop, viewModel)
+                    0 -> ShopTab(
+                        myShop, viewModel,
+                        approvedProductCount = myProducts.count { it.status == "APPROVED" },
+                        pendingProductCount = myProducts.count { it.status == "PENDING" },
+                        branchCount = myBranches.size
+                    )
                     1 -> ProductsTab(myProducts, viewModel)
                     2 -> OrdersTab(myOrders, viewModel)
                     3 -> BranchesTab(myBranches, viewModel)
@@ -196,7 +195,7 @@ fun SellerDashboardScreen(navController: NavController) {
 }
 
 @Composable
-private fun ShopTab(shop: SellerResponse?, viewModel: SellerViewModel) {
+private fun ShopTab(shop: SellerResponse?, viewModel: SellerViewModel, approvedProductCount: Int, pendingProductCount: Int, branchCount: Int) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     val isUploading by viewModel.isUploading.collectAsState()
@@ -264,6 +263,16 @@ private fun ShopTab(shop: SellerResponse?, viewModel: SellerViewModel) {
                     else -> Unit
                 }
             }
+            if (shop.status == "APPROVED" || shop.status == "PENDING") {
+                item {
+                    ReadinessBanner(
+                        approvedProductCount = approvedProductCount,
+                        pendingProductCount = pendingProductCount,
+                        branchCount = branchCount,
+                        isPending = shop.status == "PENDING"
+                    )
+                }
+            }
             item {
                 ShopInfoCard(shop, onEdit = { showEditDialog = true })
             }
@@ -328,6 +337,119 @@ private fun ModerationBanner(
                 Text(subtitle, fontFamily = SoraFontFamily, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
             }
         }
+    }
+}
+
+@Composable
+private fun ReadinessBanner(approvedProductCount: Int, pendingProductCount: Int, branchCount: Int, isPending: Boolean = false) {
+    val hasBranch = branchCount >= 1
+    val hasProducts = approvedProductCount >= 5
+    val isReady = hasBranch && hasProducts && !isPending
+
+    if (isReady) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFFE8F5E9),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4CAF50))
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.TwoTone.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(22.dp))
+                Text(
+                    "Магазин виден покупателям в каталоге",
+                    fontFamily = SoraFontFamily,
+                    fontWeight = FontWeight.W600,
+                    fontSize = 14.sp,
+                    color = Color(0xFF2E7D32)
+                )
+            }
+        }
+    } else {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = colorDarkOrange.copy(alpha = 0.07f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, colorDarkOrange.copy(alpha = 0.4f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.TwoTone.Info, null, tint = colorDarkOrange, modifier = Modifier.size(18.dp))
+                    Text(
+                        if (isPending) "Подготовьте магазин пока идёт проверка"
+                        else "Магазин пока не виден покупателям",
+                        fontFamily = SoraFontFamily,
+                        fontWeight = FontWeight.W600,
+                        fontSize = 14.sp,
+                        color = colorDarkOrange
+                    )
+                }
+                Text(
+                    if (isPending)
+                        "Выполните шаги заранее — после одобрения магазин появится в каталоге сразу:"
+                    else
+                        "Выполните все шаги чтобы ваш магазин появился в каталоге:",
+                    fontFamily = SoraFontFamily,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ReadinessStep(
+                    done = !isPending,
+                    text = if (isPending) "Дождитесь одобрения модератором" else "Магазин одобрен модератором"
+                )
+                ReadinessStep(
+                    done = hasBranch,
+                    text = if (hasBranch) "Филиал добавлен" else "Добавьте хотя бы 1 филиал"
+                )
+                ReadinessStep(
+                    done = hasProducts,
+                    pending = !hasProducts && pendingProductCount > 0,
+                    text = when {
+                        hasProducts -> "Товары одобрены ($approvedProductCount/5)"
+                        pendingProductCount > 0 -> "На проверке $pendingProductCount товар(а) — одобрено $approvedProductCount/5"
+                        else -> "Добавьте минимум 5 товаров ($approvedProductCount/5)"
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadinessStep(done: Boolean, pending: Boolean = false, text: String) {
+    val iconColor = when {
+        done -> Color(0xFF4CAF50)
+        pending -> Color(0xFFF59E0B)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    }
+    val icon = when {
+        done -> Icons.TwoTone.CheckCircle
+        pending -> Icons.Filled.AccessTime
+        else -> Icons.TwoTone.Info
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = iconColor
+        )
+        Text(
+            text,
+            fontFamily = SoraFontFamily,
+            fontSize = 13.sp,
+            fontWeight = if (done) FontWeight.W400 else FontWeight.W600,
+            color = if (pending) Color(0xFFF59E0B) else if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -603,10 +725,31 @@ private fun ProductItemCard(
             }
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(product.name, fontFamily = SoraFontFamily, fontWeight = FontWeight.W600, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        product.name,
+                        fontFamily = SoraFontFamily,
+                        fontWeight = FontWeight.W600,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    ProductStatusBadge(product.status)
+                }
                 Text(product.type.type, fontFamily = SoraFontFamily, fontSize = 12.sp, color = colorDarkOrange)
                 val priceText = product.sizes.joinToString(" · ") { "${it.size}: ${it.price.toInt()}₽" }
                 Text(priceText, fontFamily = SoraFontFamily, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!product.rejectionReason.isNullOrBlank()) {
+                    Text(
+                        "Причина: ${product.rejectionReason}",
+                        fontFamily = SoraFontFamily,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
             Row {
                 IconButton(onClick = onEdit) {
@@ -634,6 +777,29 @@ private fun ProductItemCard(
                     Text("Отмена", fontFamily = SoraFontFamily)
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun ProductStatusBadge(status: String) {
+    val (color, label) = when (status) {
+        "APPROVED" -> Color(0xFF22C55E) to "Одобрен"
+        "PENDING" -> Color(0xFFF59E0B) to "На проверке"
+        "REJECTED" -> MaterialTheme.colorScheme.error to "Отклонён"
+        else -> MaterialTheme.colorScheme.outline to status
+    }
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = color.copy(alpha = 0.15f)
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            fontFamily = SoraFontFamily,
+            fontWeight = FontWeight.W600,
+            fontSize = 10.sp,
+            color = color
         )
     }
 }

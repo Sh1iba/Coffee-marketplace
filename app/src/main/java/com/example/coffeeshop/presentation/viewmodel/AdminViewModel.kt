@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.coffeeshop.data.remote.response.AdminCourierResponse
 import com.example.coffeeshop.data.remote.response.AdminUserResponse
+import com.example.coffeeshop.data.remote.response.ProductResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
 import com.example.coffeeshop.data.repository.AdminRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +30,12 @@ class AdminViewModel @Inject constructor(
     private val _couriers = MutableStateFlow<List<AdminCourierResponse>>(emptyList())
     val couriers: StateFlow<List<AdminCourierResponse>> = _couriers
 
+    private val _pendingProducts = MutableStateFlow<List<ProductResponse>>(emptyList())
+    val pendingProducts: StateFlow<List<ProductResponse>> = _pendingProducts
+
+    private val _sellerProducts = MutableStateFlow<Map<Long, List<ProductResponse>>>(emptyMap())
+    val sellerProducts: StateFlow<Map<Long, List<ProductResponse>>> = _sellerProducts
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
@@ -40,6 +47,12 @@ class AdminViewModel @Inject constructor(
             _isLoading.value = true
             _pendingSellers.value = adminRepository.getPendingSellers()
             _isLoading.value = false
+        }
+    }
+
+    fun loadPendingProducts() {
+        viewModelScope.launch {
+            _pendingProducts.value = adminRepository.getPendingProducts()
         }
     }
 
@@ -100,6 +113,54 @@ class AdminViewModel @Inject constructor(
                 _error.value = "Не удалось изменить статус магазина"
             }
         }
+    }
+
+    fun loadSellerProducts(sellerId: Long) {
+        viewModelScope.launch {
+            val products = adminRepository.getSellerProducts(sellerId)
+            _sellerProducts.value = _sellerProducts.value + (sellerId to products)
+        }
+    }
+
+    fun approveProduct(sellerId: Long, productId: Int) {
+        viewModelScope.launch {
+            if (adminRepository.approveProduct(productId)) {
+                updateProductStatus(sellerId, productId, "APPROVED")
+                _pendingProducts.value = _pendingProducts.value.filter { it.id != productId }
+            } else {
+                _error.value = "Не удалось одобрить товар"
+            }
+        }
+    }
+
+    fun rejectProduct(sellerId: Long, productId: Int, reason: String) {
+        viewModelScope.launch {
+            if (adminRepository.rejectProduct(productId, reason)) {
+                updateProductStatus(sellerId, productId, "REJECTED", reason)
+                _pendingProducts.value = _pendingProducts.value.filter { it.id != productId }
+            } else {
+                _error.value = "Не удалось отклонить товар"
+            }
+        }
+    }
+
+    fun deleteProduct(sellerId: Long, productId: Int) {
+        viewModelScope.launch {
+            if (adminRepository.deleteProduct(productId)) {
+                val updated = _sellerProducts.value[sellerId]?.filter { it.id != productId } ?: emptyList()
+                _sellerProducts.value = _sellerProducts.value + (sellerId to updated)
+                _pendingProducts.value = _pendingProducts.value.filter { it.id != productId }
+            } else {
+                _error.value = "Не удалось удалить товар"
+            }
+        }
+    }
+
+    private fun updateProductStatus(sellerId: Long, productId: Int, status: String, reason: String? = null) {
+        val updated = _sellerProducts.value[sellerId]?.map {
+            if (it.id == productId) it.copy(status = status, rejectionReason = reason) else it
+        } ?: emptyList()
+        _sellerProducts.value = _sellerProducts.value + (sellerId to updated)
     }
 
     fun clearError() { _error.value = null }

@@ -231,4 +231,22 @@ interface ApiService {
 
     @DELETE("admin/couriers/{courierId}")
     suspend fun removeCourier(@Path("courierId") courierId: Long): Response<ApiResponse>
+
+    @GET("admin/products/pending")
+    suspend fun getAdminPendingProducts(): Response<List<ProductResponse>>
+
+    @GET("admin/sellers/{sellerId}/products")
+    suspend fun getAdminSellerProducts(@Path("sellerId") sellerId: Long): Response<List<ProductResponse>>
+
+    @PUT("admin/products/{productId}/approve")
+    suspend fun adminApproveProduct(@Path("productId") productId: Int): Response<ApiResponse>
+
+    @PUT("admin/products/{productId}/reject")
+    suspend fun adminRejectProduct(
+        @Path("productId") productId: Int,
+        @Body request: RejectSellerRequest
+    ): Response<ApiResponse>
+
+    @DELETE("admin/products/{productId}")
+    suspend fun adminDeleteProduct(@Path("productId") productId: Int): Response<ApiResponse>
 }

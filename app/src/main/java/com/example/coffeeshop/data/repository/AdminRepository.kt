@@ -3,6 +3,7 @@ package com.example.coffeeshop.data.repository
 import com.example.coffeeshop.data.remote.api.ApiService
 import com.example.coffeeshop.data.remote.response.AdminCourierResponse
 import com.example.coffeeshop.data.remote.response.AdminUserResponse
+import com.example.coffeeshop.data.remote.response.ProductResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
 import com.example.coffeeshop.domain.RejectSellerRequest
 import com.example.coffeeshop.domain.RoleChangeRequest
@@ -55,5 +56,25 @@ class AdminRepository @Inject constructor(
 
     suspend fun removeCourier(courierId: Long): Boolean = try {
         apiService.removeCourier(courierId).isSuccessful
+    } catch (e: Exception) { false }
+
+    suspend fun getPendingProducts(): List<ProductResponse> = try {
+        apiService.getAdminPendingProducts().body() ?: emptyList()
+    } catch (e: Exception) { emptyList() }
+
+    suspend fun getSellerProducts(sellerId: Long): List<ProductResponse> = try {
+        apiService.getAdminSellerProducts(sellerId).body() ?: emptyList()
+    } catch (e: Exception) { emptyList() }
+
+    suspend fun approveProduct(productId: Int): Boolean = try {
+        apiService.adminApproveProduct(productId).isSuccessful
+    } catch (e: Exception) { false }
+
+    suspend fun rejectProduct(productId: Int, reason: String): Boolean = try {
+        apiService.adminRejectProduct(productId, RejectSellerRequest(reason)).isSuccessful
+    } catch (e: Exception) { false }
+
+    suspend fun deleteProduct(productId: Int): Boolean = try {
+        apiService.adminDeleteProduct(productId).isSuccessful
     } catch (e: Exception) { false }
 }
