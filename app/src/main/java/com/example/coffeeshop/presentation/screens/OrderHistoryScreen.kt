@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -62,11 +63,25 @@ private fun statusColor(s: String) = when (s) {
 @Composable
 fun OrderHistoryScreen(navController: NavController) {
     val viewModel: OrderHistoryViewModel = hiltViewModel()
-    val orders    by viewModel.orders.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val error     by viewModel.error.collectAsState()
+    val orders          by viewModel.orders.collectAsState()
+    val isLoading       by viewModel.isLoading.collectAsState()
+    val error           by viewModel.error.collectAsState()
+    val reviewedOrderIds by viewModel.reviewedOrderIds.collectAsState()
+    val reviewError     by viewModel.reviewError.collectAsState()
+
+    var reviewingOrderId by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(Unit) { viewModel.loadOrderHistory() }
+
+    reviewingOrderId?.let { orderId ->
+        ReviewDialog(
+            onDismiss = { reviewingOrderId = null },
+            onSubmit = { rating, comment ->
+                viewModel.submitReview(orderId, rating, comment.ifBlank { null })
+                reviewingOrderId = null
+            }
+        )
+    }
 
     val doneOrders = orders.filter { it.status in DONE_STATUSES }
     val currency   = NumberFormat.getCurrencyInstance(Locale("ru", "RU"))
@@ -110,6 +125,13 @@ fun OrderHistoryScreen(navController: NavController) {
             ) { Text(msg) }
         }
 
+        reviewError?.let { msg ->
+            Snackbar(
+                modifier = Modifier.padding(16.dp),
+                action = { TextButton(onClick = { viewModel.clearReviewError() }) { Text("OK", color = colorDarkOrange) } }
+            ) { Text(msg) }
+        }
+
         when {
             isLoading && orders.isEmpty() -> Box(
                 Modifier.fillMaxSize().padding(innerPadding),
@@ -130,7 +152,12 @@ fun OrderHistoryScreen(navController: NavController) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(doneOrders, key = { it.id }) { order ->
-                    HistoryOrderCard(order = order, currency = currency)
+                    HistoryOrderCard(
+                        order = order,
+                        currency = currency,
+                        isReviewed = order.id in reviewedOrderIds,
+                        onReviewClick = { reviewingOrderId = order.id }
+                    )
                 }
             }
         }
@@ -199,7 +226,12 @@ private fun CompactItemRow(item: OrderItemResponse, currency: NumberFormat) {
 // ─── History order card ───────────────────────────────────────────────────────
 
 @Composable
-private fun HistoryOrderCard(order: OrderResponse, currency: NumberFormat) {
+private fun HistoryOrderCard(
+    order: OrderResponse,
+    currency: NumberFormat,
+    isReviewed: Boolean = false,
+    onReviewClick: () -> Unit = {}
+) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
@@ -262,8 +294,77 @@ private fun HistoryOrderCard(order: OrderResponse, currency: NumberFormat) {
                     )
                 }
             }
+
+            if (order.status == "DELIVERED" && !isReviewed) {
+                TextButton(
+                    onClick = onReviewClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Star, null, modifier = Modifier.size(16.dp), tint = colorDarkOrange)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Оценить заказ", fontFamily = SoraFontFamily, fontSize = 13.sp, color = colorDarkOrange)
+                }
+            }
         }
     }
+}
+
+// ─── Review dialog ────────────────────────────────────────────────────────────
+
+@Composable
+private fun ReviewDialog(onDismiss: () -> Unit, onSubmit: (rating: Int, comment: String) -> Unit) {
+    var rating  by remember { mutableStateOf(0) }
+    var comment by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Оценить заказ", fontFamily = SoraFontFamily, fontWeight = FontWeight.W600, fontSize = 18.sp)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Выберите оценку:", fontFamily = SoraFontFamily, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (i in 1..5) {
+                        IconButton(onClick = { rating = i }, modifier = Modifier.size(40.dp)) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = "$i звезд",
+                                tint = if (i <= rating) colorDarkOrange else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    placeholder = { Text("Комментарий (необязательно)", fontFamily = SoraFontFamily, fontSize = 13.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 4,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colorDarkOrange,
+                        focusedLabelColor = colorDarkOrange
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (rating > 0) onSubmit(rating, comment) },
+                enabled = rating > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = colorDarkOrange)
+            ) {
+                Text("Отправить", fontFamily = SoraFontFamily)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена", fontFamily = SoraFontFamily, color = colorDarkOrange)
+            }
+        }
+    )
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -309,7 +410,7 @@ private fun EmptyHistoryState(modifier: Modifier = Modifier) {
 @Composable
 fun OrderCard(order: OrderResponse) {
     val currency = NumberFormat.getCurrencyInstance(Locale("ru", "RU"))
-    HistoryOrderCard(order = order, currency = currency)
+    HistoryOrderCard(order = order, currency = currency, isReviewed = false, onReviewClick = {})
 }
 
 @Composable

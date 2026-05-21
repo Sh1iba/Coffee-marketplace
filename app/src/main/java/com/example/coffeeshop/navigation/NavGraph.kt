@@ -157,6 +157,15 @@ fun AppNavGraph(
             SellerStoreScreen(navController = navController, sellerId = id)
         }
 
+        // ── Seller reviews ──────────────────────────────────────────────────
+        composable(
+            route = "${NavigationRoutes.SELLER_REVIEWS}/{sellerId}",
+            arguments = listOf(navArgument("sellerId") { type = NavType.LongType })
+        ) { entry ->
+            val id = entry.arguments?.getLong("sellerId") ?: return@composable
+            SellerReviewsScreen(navController = navController, sellerId = id)
+        }
+
         // ── Admin ───────────────────────────────────────────────────────────
         composable(NavigationRoutes.ADMIN_DASHBOARD) {
             AdminDashboardScreen(navController)

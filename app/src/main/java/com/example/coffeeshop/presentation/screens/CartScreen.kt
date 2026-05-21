@@ -32,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import java.net.URLEncoder
 import com.example.coffeeshop.R
+import androidx.compose.foundation.lazy.LazyRow
 import com.example.coffeeshop.data.remote.response.CartItemResponse
 import com.example.coffeeshop.navigation.NavigationRoutes
 import com.example.coffeeshop.presentation.theme.CoffeeShopTheme
@@ -51,11 +52,26 @@ fun CartScreen(
     val cartItems by viewModel.cartItems.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val sellers by viewModel.sellers.collectAsState()
+
+    val storeList = remember(sellers, cartItems) {
+        cartItems.mapNotNull { it.sellerId }.distinct()
+            .mapNotNull { id -> sellers[id]?.let { id to it } }
+    }
+
+    var selectedStoreId by remember(storeList) {
+        mutableStateOf(storeList.firstOrNull()?.first)
+    }
+
+    val visibleItems = remember(cartItems, selectedStoreId) {
+        if (selectedStoreId == null) cartItems
+        else cartItems.filter { it.sellerId == selectedStoreId }
+    }
 
     var selectedKeys by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
 
-    val selectedCartItems = remember(cartItems, selectedKeys) {
-        cartItems.filter { item ->
+    val selectedCartItems = remember(visibleItems, selectedKeys) {
+        visibleItems.filter { item ->
             val key = "${item.id}_${item.selectedSize}"
             selectedKeys.contains(key)
         }
@@ -69,8 +85,8 @@ fun CartScreen(
         selectedCartItems.sumOf { it.quantity }
     }
 
-    val allSelected = remember(cartItems, selectedKeys) {
-        cartItems.isNotEmpty() && selectedKeys.size == cartItems.size
+    val allSelected = remember(visibleItems, selectedKeys) {
+        visibleItems.isNotEmpty() && visibleItems.all { selectedKeys.contains("${it.id}_${it.selectedSize}") }
     }
 
     LaunchedEffect(Unit) {
@@ -97,6 +113,36 @@ fun CartScreen(
                 )
 
                 if (cartItems.isNotEmpty()) {
+                    // Горизонтальный скролл табов по магазинам
+                    if (storeList.size > 1) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(storeList) { (id, seller) ->
+                                val isSelected = selectedStoreId == id
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(if (isSelected) colorDarkOrange else colorDarkOrange.copy(alpha = 0.10f))
+                                        .clickable {
+                                            selectedStoreId = id
+                                            selectedKeys = emptySet()
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        text = seller.name,
+                                        fontFamily = SoraFontFamily,
+                                        fontWeight = FontWeight.W600,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) Color.White else colorDarkOrange
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -111,7 +157,7 @@ fun CartScreen(
                                 if (allSelected) {
                                     selectedKeys = emptySet()
                                 } else {
-                                    selectedKeys = cartItems.map { "${it.id}_${it.selectedSize}" }.toSet()
+                                    selectedKeys = visibleItems.map { "${it.id}_${it.selectedSize}" }.toSet()
                                 }
                             }
                         ) {
@@ -119,7 +165,7 @@ fun CartScreen(
                                 checked = allSelected,
                                 onCheckedChange = { isChecked ->
                                     selectedKeys = if (isChecked) {
-                                        cartItems.map { "${it.id}_${it.selectedSize}" }.toSet()
+                                        visibleItems.map { "${it.id}_${it.selectedSize}" }.toSet()
                                     } else {
                                         emptySet()
                                     }
@@ -212,7 +258,7 @@ fun CartScreen(
                     }
                 }
             }
-            cartItems.isEmpty() -> {
+            cartItems.isEmpty() && !isLoading -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -230,7 +276,7 @@ fun CartScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         contentPadding = PaddingValues(bottom = 32.dp)
                     ) {
-                        items(cartItems) { item ->
+                        items(visibleItems) { item ->
                             CartItemCard(
                                 item = item,
                                 viewModel = viewModel,

@@ -18,11 +18,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -145,8 +142,7 @@ fun CoffeeDetailScreen(
                 price = currentPrice,
                 isInCart = isInCartWithCurrentSize,
                 onButtonClick = {
-                    if (isInCartWithCurrentSize) {
-                    } else {
+                    if (!isInCartWithCurrentSize) {
                         viewModel.addToCart()
                     }
                 }
@@ -182,91 +178,33 @@ fun CoffeeDetailScreen(
                 }
             }
 
-            Row(
+            Column(
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
-                    .wrapContentHeight()
                     .padding(top = 16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .fillMaxWidth()
             ) {
-                Column {
-                    Text(
-                        text = currentCoffee?.name ?: coffee.name,
-                        fontFamily = SoraFontFamily,
-                        fontWeight = FontWeight.W600,
-                        fontSize = 20.sp,
-                        lineHeight = 30.sp,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Text(
-                        text = currentCoffee?.type?.type ?: coffee.type.type,
-                        fontWeight = FontWeight.W400,
-                        fontSize = 12.sp,
-                        lineHeight = 14.4.sp,
-                        color = colorLightGrey
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(
-                                style = SpanStyle(
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                            ) {
-                                append("⭐ 4.8 ")
-                            }
-                            withStyle(
-                                style = SpanStyle(
-                                    color = colorLightGrey,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.W400
-                                )
-                            ) {
-                                append("(150)")
-                            }
-                        },
-                        fontWeight = FontWeight.W600,
-                        fontSize = 16.sp,
-                        color = colorLightGrey
-                    )
-                }
-
-                Box(
-                    modifier = Modifier.height(85.dp),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .wrapContentWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Image(
-                            painter = painterResource(id = com.example.coffeeshop.R.drawable.fast_delivery),
-                            contentDescription = "Fast Delivery",
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-
-                        Image(
-                            painter = painterResource(id = com.example.coffeeshop.R.drawable.quality_bean),
-                            contentDescription = "Quality Bean",
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-
-                        Image(
-                            painter = painterResource(id = com.example.coffeeshop.R.drawable.extra_milk),
-                            contentDescription = "Extra Milk",
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
-                    }
-                }
+                Text(
+                    text = currentCoffee?.name ?: coffee.name,
+                    fontFamily = SoraFontFamily,
+                    fontWeight = FontWeight.W600,
+                    fontSize = 20.sp,
+                    lineHeight = 30.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Text(
+                    text = currentCoffee?.type?.type ?: coffee.type.type,
+                    fontWeight = FontWeight.W400,
+                    fontSize = 12.sp,
+                    lineHeight = 14.4.sp,
+                    color = colorLightGrey
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                ProductTagsRow(
+                    category = currentCoffee?.type?.type ?: coffee.type.type,
+                    sizes = currentCoffee?.sizes ?: coffee.sizes,
+                    selectedSize = selectedSize ?: ""
+                )
             }
 
             Spacer(modifier = Modifier.height(5.dp))
@@ -369,6 +307,57 @@ fun CoffeeDetailScreen(
                 }
             }
         }
+    }
+
+}
+
+@Composable
+private fun ProductTagsRow(
+    category: String,
+    sizes: List<ProductVariantResponse>,
+    selectedSize: String
+) {
+    val volumeLabel = sizes.find { it.size == selectedSize }?.volume
+        ?: sizes.firstOrNull()?.volume
+
+    val categoryTag = category
+    val volumeTag = if (!volumeLabel.isNullOrBlank()) volumeLabel else null
+    val typeTag = when {
+        category.contains("Кофе", ignoreCase = true) ||
+        category.contains("Напит", ignoreCase = true) -> "Напиток"
+        category.contains("Выпечка", ignoreCase = true) ||
+        category.contains("Десерт", ignoreCase = true) -> "Выпечка"
+        category.contains("Сандвич", ignoreCase = true) ||
+        category.contains("Сэндвич", ignoreCase = true) -> "Сэндвич"
+        category.contains("Завтрак", ignoreCase = true) -> "Завтрак"
+        category.contains("Восточ", ignoreCase = true) ||
+        category.contains("Специ", ignoreCase = true) -> "Восточная кухня"
+        category.contains("Салат", ignoreCase = true) ||
+        category.contains("Здоров", ignoreCase = true) -> "ПП-питание"
+        else -> null
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ProductTag(text = categoryTag)
+        if (volumeTag != null) ProductTag(text = volumeTag)
+        if (typeTag != null && typeTag != categoryTag) ProductTag(text = typeTag)
+    }
+}
+
+@Composable
+private fun ProductTag(text: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            fontFamily = SoraFontFamily,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.W500,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

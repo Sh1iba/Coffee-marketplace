@@ -13,6 +13,7 @@ import com.example.coffeeshop.data.remote.response.LoginResponse
 import com.example.coffeeshop.data.remote.response.OrderResponse
 import com.example.coffeeshop.data.remote.response.PagedProductResponse
 import com.example.coffeeshop.data.remote.response.RegisterResponse
+import com.example.coffeeshop.data.remote.response.ReviewResponse
 import com.example.coffeeshop.data.remote.response.SellerOrderResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
 import com.example.coffeeshop.domain.BranchRequest
@@ -27,6 +28,7 @@ import com.example.coffeeshop.domain.ProductManageRequest
 import com.example.coffeeshop.domain.RegisterRequest
 import com.example.coffeeshop.domain.SellerRequest
 import com.example.coffeeshop.domain.UpdateCartQuantityRequest
+import com.example.coffeeshop.domain.ReviewRequest
 import com.example.coffeeshop.domain.UpdateProfileRequest
 import okhttp3.MultipartBody
 import retrofit2.Response
@@ -263,5 +265,16 @@ interface ApiService {
         @Path("branchId") branchId: Long,
         @Body request: RejectSellerRequest
     ): Response<ApiResponse>
+
+    // ── REVIEWS ────────────────────────────────────────────────────────────
+
+    @GET("reviews/seller/{sellerId}")
+    suspend fun getSellerReviews(@Path("sellerId") sellerId: Long): Response<List<ReviewResponse>>
+
+    @POST("reviews")
+    suspend fun submitReview(@Body request: ReviewRequest): Response<ReviewResponse>
+
+    @GET("reviews/my")
+    suspend fun getMyReviews(): Response<List<ReviewResponse>>
 
 }

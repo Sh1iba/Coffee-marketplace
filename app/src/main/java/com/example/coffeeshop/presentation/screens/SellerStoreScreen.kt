@@ -37,8 +37,10 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.coffeeshop.R
 import com.example.coffeeshop.data.remote.response.ProductResponse
+import com.example.coffeeshop.data.remote.response.ReviewResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
 import com.example.coffeeshop.data.repository.ProductRepository
+import com.example.coffeeshop.data.repository.ReviewRepository
 import com.example.coffeeshop.data.repository.SellerRepository
 import com.example.coffeeshop.navigation.NavigationRoutes
 import com.example.coffeeshop.presentation.theme.SoraFontFamily
@@ -56,7 +58,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SellerStoreViewModel @Inject constructor(
     private val sellerRepository: SellerRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val reviewRepository: ReviewRepository
 ) : ViewModel() {
 
     private val _seller = MutableStateFlow<SellerResponse?>(null)
@@ -64,6 +67,9 @@ class SellerStoreViewModel @Inject constructor(
 
     private val _products = MutableStateFlow<List<ProductResponse>>(emptyList())
     val products: StateFlow<List<ProductResponse>> = _products
+
+    private val _reviews = MutableStateFlow<List<ReviewResponse>>(emptyList())
+    val reviews: StateFlow<List<ReviewResponse>> = _reviews
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading
@@ -76,6 +82,7 @@ class SellerStoreViewModel @Inject constructor(
                 val all = productRepository.getAllProducts()
                 _products.value = all.filter { it.sellerId == sellerId }
             } catch (_: Exception) {}
+            _reviews.value = reviewRepository.getSellerReviews(sellerId)
             _isLoading.value = false
         }
     }
@@ -90,6 +97,7 @@ fun SellerStoreScreen(navController: NavController, sellerId: Long) {
 
     val seller    by viewModel.seller.collectAsState()
     val products  by viewModel.products.collectAsState()
+    val reviews   by viewModel.reviews.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     var searchQuery      by rememberSaveable { mutableStateOf("") }
@@ -160,7 +168,16 @@ fun SellerStoreScreen(navController: NavController, sellerId: Long) {
             ) {
                 // Шапка магазина
                 seller?.let { s ->
-                    item { SellerStoreHeader(s, productCount = products.size) }
+                    item {
+                        SellerStoreHeader(
+                            seller = s,
+                            productCount = products.size,
+                            reviewCount = reviews.size,
+                            onReviewsClick = {
+                                navController.navigate("${NavigationRoutes.SELLER_REVIEWS}/$sellerId")
+                            }
+                        )
+                    }
                 }
 
                 // Поиск
@@ -268,41 +285,125 @@ fun SellerStoreScreen(navController: NavController, sellerId: Long) {
                         )
                     }
                 }
+
+                // Отзывы
+                if (reviews.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Отзывы (${reviews.size})",
+                                fontFamily = SoraFontFamily,
+                                fontWeight = FontWeight.W600,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            TextButton(onClick = {
+                                navController.navigate("${NavigationRoutes.SELLER_REVIEWS}/$sellerId")
+                            }) {
+                                Text(
+                                    "Все",
+                                    fontFamily = SoraFontFamily,
+                                    fontSize = 13.sp,
+                                    color = colorDarkOrange
+                                )
+                                Icon(
+                                    Icons.TwoTone.ArrowForward,
+                                    contentDescription = null,
+                                    tint = colorDarkOrange,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                    items(reviews.take(3)) { review ->
+                        ReviewCard(review = review)
+                    }
+                    if (reviews.size > 3) {
+                        item {
+                            TextButton(
+                                onClick = {
+                                    navController.navigate("${NavigationRoutes.SELLER_REVIEWS}/$sellerId")
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp)
+                            ) {
+                                Text(
+                                    "Показать все ${reviews.size} отзывов",
+                                    fontFamily = SoraFontFamily,
+                                    fontSize = 13.sp,
+                                    color = colorDarkOrange
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SellerStoreHeader(seller: SellerResponse, productCount: Int = 0) {
+private fun SellerStoreHeader(
+    seller: SellerResponse,
+    productCount: Int = 0,
+    reviewCount: Int = 0,
+    onReviewsClick: () -> Unit = {}
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Баннер-фон
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
+                .height(180.dp)
                 .background(
                     brush = Brush.linearGradient(listOf(Color(0xFF313131), Color(0xFF111111)))
-                ),
-            contentAlignment = Alignment.Center
+                )
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    Icons.TwoTone.ShoppingCart,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = Color.White.copy(alpha = 0.7f)
+            if (!seller.logoImage.isNullOrEmpty()) {
+                AsyncImage(
+                    model = seller.logoImage,
+                    contentDescription = seller.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
-                Text(
-                    seller.name,
-                    fontFamily = SoraFontFamily,
-                    fontWeight = FontWeight.W700,
-                    fontSize = 22.sp,
-                    color = Color.White
+                // Затемняющий градиент снизу чтобы карточка читалась
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
+                            )
+                        )
                 )
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.TwoTone.ShoppingCart,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.White.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            seller.name,
+                            fontFamily = SoraFontFamily,
+                            fontWeight = FontWeight.W700,
+                            fontSize = 22.sp,
+                            color = Color.White
+                        )
+                    }
+                }
             }
         }
 
@@ -320,37 +421,18 @@ private fun SellerStoreHeader(seller: SellerResponse, productCount: Int = 0) {
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = colorDarkOrange.copy(alpha = 0.12f)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = colorDarkOrange.copy(alpha = 0.12f)
-                    ) {
-                        Text(
-                            seller.category,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            fontFamily = SoraFontFamily,
-                            fontSize = 12.sp,
-                            color = colorDarkOrange,
-                            fontWeight = FontWeight.W600
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(Icons.TwoTone.Star, null, tint = colorDarkOrange, modifier = Modifier.size(16.dp))
-                        Text(
-                            "%.1f".format(seller.rating),
-                            fontFamily = SoraFontFamily,
-                            fontWeight = FontWeight.W600,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    Text(
+                        seller.category,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        fontFamily = SoraFontFamily,
+                        fontSize = 12.sp,
+                        color = colorDarkOrange,
+                        fontWeight = FontWeight.W600
+                    )
                 }
 
                 Text(
@@ -369,7 +451,12 @@ private fun SellerStoreHeader(seller: SellerResponse, productCount: Int = 0) {
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     StoreStatItem(icon = Icons.TwoTone.ShoppingCart, value = productCount.toString(), label = "Товаров")
-                    StoreStatItem(icon = Icons.TwoTone.Star, value = "%.1f".format(seller.rating), label = "Рейтинг")
+                    StoreStatItem(
+                        icon = Icons.TwoTone.Star,
+                        value = if (reviewCount > 0) "%.1f ($reviewCount)".format(seller.rating) else "%.1f".format(seller.rating),
+                        label = "смотреть >",
+                        onClick = onReviewsClick
+                    )
                     StoreStatItem(icon = Icons.TwoTone.Person, value = seller.ownerName, label = "Продавец")
                 }
             }
@@ -378,11 +465,77 @@ private fun SellerStoreHeader(seller: SellerResponse, productCount: Int = 0) {
 }
 
 @Composable
-private fun StoreStatItem(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+private fun StoreStatItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    onClick: (() -> Unit)? = null
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = if (onClick != null) Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+        else Modifier
+    ) {
         Icon(icon, null, tint = colorDarkOrange, modifier = Modifier.size(20.dp))
         Text(value, fontFamily = SoraFontFamily, fontWeight = FontWeight.W600, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(label, fontFamily = SoraFontFamily, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            fontFamily = SoraFontFamily,
+            fontSize = 10.sp,
+            color = if (onClick != null) colorDarkOrange else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+internal fun ReviewCard(review: ReviewResponse) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    review.userName,
+                    fontFamily = SoraFontFamily,
+                    fontWeight = FontWeight.W600,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    repeat(review.rating) {
+                        Icon(Icons.TwoTone.Star, null, tint = colorDarkOrange, modifier = Modifier.size(14.dp))
+                    }
+                }
+            }
+            if (!review.comment.isNullOrBlank()) {
+                Text(
+                    review.comment,
+                    fontFamily = SoraFontFamily,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+            }
+            Text(
+                review.createdAt.take(10).replace("-", "."),
+                fontFamily = SoraFontFamily,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

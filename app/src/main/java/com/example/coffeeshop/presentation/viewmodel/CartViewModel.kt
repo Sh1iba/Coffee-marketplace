@@ -1,13 +1,14 @@
 package com.example.coffeeshop.presentation.viewmodel
 
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.coffeeshop.data.remote.response.CartSummaryResponse
 import com.example.coffeeshop.data.remote.response.CartItemResponse
 import com.example.coffeeshop.data.remote.response.ProductResponse
+import com.example.coffeeshop.data.remote.response.SellerResponse
 import com.example.coffeeshop.data.repository.CartRepository
 import com.example.coffeeshop.data.repository.ProductRepository
+import com.example.coffeeshop.data.repository.SellerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,7 +22,8 @@ import javax.inject.Inject
 @HiltViewModel
 class CartViewModel @Inject constructor(
     private val cartRepository: CartRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val sellerRepository: SellerRepository
 ) : ViewModel() {
 
     private val _cartSummary = MutableStateFlow<CartSummaryResponse?>(null)
@@ -37,7 +39,6 @@ class CartViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-
     val totalPrice: StateFlow<Double> = _cartSummary.map { summary ->
         summary?.totalPrice?.toDouble() ?: 0.0
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0.0)
@@ -45,6 +46,9 @@ class CartViewModel @Inject constructor(
     val totalItems: StateFlow<Int> = _cartSummary.map { summary ->
         summary?.totalItems ?: 0
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), 0)
+
+    private val _sellers = MutableStateFlow<Map<Long, SellerResponse>>(emptyMap())
+    val sellers: StateFlow<Map<Long, SellerResponse>> = _sellers.asStateFlow()
 
     suspend fun checkIfInCart(productId: Int, selectedSize: String): Boolean {
         return cartRepository.isInCart(productId, selectedSize)
@@ -57,6 +61,12 @@ class CartViewModel @Inject constructor(
             try {
                 val summary = cartRepository.getCart()
                 _cartSummary.value = summary
+                val uniqueSellerIds = summary.items.mapNotNull { it.sellerId }.distinct()
+                val sellersMap = mutableMapOf<Long, SellerResponse>()
+                uniqueSellerIds.forEach { id ->
+                    sellerRepository.getSellerById(id)?.let { sellersMap[id] = it }
+                }
+                _sellers.value = sellersMap
             } catch (e: Exception) {
                 _error.value = "Ошибка загрузки корзины: ${e.message}"
             } finally {
@@ -106,7 +116,10 @@ class CartViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val success = cartRepository.clearCart()
-                if (success) _cartSummary.value = CartSummaryResponse(emptyList(), 0, 0f)
+                if (success) {
+                    _cartSummary.value = CartSummaryResponse(emptyList(), 0, 0f)
+                    _sellers.value = emptyMap()
+                }
             } catch (e: Exception) {
                 _error.value = "Ошибка очистки корзины: ${e.message}"
             }

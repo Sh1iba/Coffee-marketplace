@@ -7,7 +7,9 @@ import com.example.coffeeshop.data.remote.response.ProductCategoryResponse
 import com.example.coffeeshop.data.remote.response.ProductResponse
 import com.example.coffeeshop.data.remote.response.SellerOrderResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
+import com.example.coffeeshop.data.remote.response.ReviewResponse
 import com.example.coffeeshop.data.repository.BranchRepository
+import com.example.coffeeshop.data.repository.ReviewRepository
 import com.example.coffeeshop.data.repository.SellerRepository
 import com.example.coffeeshop.domain.BranchRequest
 import com.example.coffeeshop.domain.ProductManageRequest
@@ -22,7 +24,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SellerViewModel @Inject constructor(
     private val sellerRepository: SellerRepository,
-    private val branchRepository: BranchRepository
+    private val branchRepository: BranchRepository,
+    private val reviewRepository: ReviewRepository
 ) : ViewModel() {
 
     private val _myShop = MutableStateFlow<SellerResponse?>(null)
@@ -45,6 +48,9 @@ class SellerViewModel @Inject constructor(
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading
+
+    private val _myReviews = MutableStateFlow<List<ReviewResponse>>(emptyList())
+    val myReviews: StateFlow<List<ReviewResponse>> = _myReviews
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
@@ -76,6 +82,13 @@ class SellerViewModel @Inject constructor(
     fun loadMyBranches() {
         viewModelScope.launch {
             _myBranches.value = branchRepository.getMyBranches()
+        }
+    }
+
+    fun loadMyReviews() {
+        viewModelScope.launch {
+            val sellerId = _myShop.value?.id ?: return@launch
+            _myReviews.value = reviewRepository.getSellerReviews(sellerId)
         }
     }
 

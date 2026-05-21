@@ -79,18 +79,20 @@ fun SellerDashboardScreen(navController: NavController) {
     val myShop by viewModel.myShop.collectAsState()
     val myProducts by viewModel.myProducts.collectAsState()
     val myBranches by viewModel.myBranches.collectAsState()
+    val myReviews by viewModel.myReviews.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val isUploading by viewModel.isUploading.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Магазин", "Товары", "Филиалы")
+    val tabs = listOf("Магазин", "Товары", "Филиалы", "Отзывы")
 
     LaunchedEffect(selectedTab) {
         when (selectedTab) {
             0 -> { viewModel.loadMyProducts(); viewModel.loadMyBranches() }
             1 -> viewModel.loadMyProducts()
             2 -> viewModel.loadMyBranches()
+            3 -> viewModel.loadMyReviews()
         }
     }
 
@@ -188,6 +190,7 @@ fun SellerDashboardScreen(navController: NavController) {
                     )
                     1 -> ProductsTab(myProducts, viewModel)
                     2 -> BranchesTab(myBranches, viewModel)
+                    3 -> SellerReviewsTab(reviews = myReviews, rating = myShop?.rating ?: 0.0)
                 }
             }
 
@@ -469,6 +472,93 @@ private fun ReadinessStep(done: Boolean, pending: Boolean = false, text: String)
             fontWeight = if (done) FontWeight.W400 else FontWeight.W600,
             color = if (pending) Color(0xFFF59E0B) else if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Composable
+private fun SellerReviewsTab(reviews: List<com.example.coffeeshop.data.remote.response.ReviewResponse>, rating: Double) {
+    if (reviews.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.TwoTone.Star, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Отзывов пока нет", fontFamily = SoraFontFamily, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+
+    val average = reviews.map { it.rating }.average()
+    val distribution = (5 downTo 1).map { star -> star to reviews.count { it.rating == star } }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(2.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "%.1f".format(average),
+                            fontFamily = SoraFontFamily,
+                            fontWeight = FontWeight.W700,
+                            fontSize = 40.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            repeat(5) { i ->
+                                Icon(
+                                    Icons.TwoTone.Star, null,
+                                    tint = if (i < average.toInt()) colorDarkOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Text("${reviews.size} отзывов", fontFamily = SoraFontFamily, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        distribution.forEach { (star, count) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("$star", fontFamily = SoraFontFamily, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(10.dp))
+                                Icon(Icons.TwoTone.Star, null, tint = colorDarkOrange, modifier = Modifier.size(12.dp))
+                                LinearProgressIndicator(
+                                    progress = { if (reviews.isEmpty()) 0f else count.toFloat() / reviews.size },
+                                    modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    color = colorDarkOrange,
+                                    trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+                                )
+                                Text("$count", fontFamily = SoraFontFamily, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(20.dp), textAlign = TextAlign.End)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        items(reviews) { review ->
+            ReviewCard(review = review)
+        }
     }
 }
 

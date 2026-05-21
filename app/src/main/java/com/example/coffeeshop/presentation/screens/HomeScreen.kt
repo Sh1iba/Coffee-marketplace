@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,7 +35,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,9 +51,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,7 +62,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -83,7 +81,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
-
 import java.net.URLEncoder
 import com.example.coffeeshop.R
 import com.example.coffeeshop.data.remote.response.NominatimAddress
@@ -114,7 +111,6 @@ fun HomeScreen(navController: NavHostController = rememberNavController()) {
     val showSizeDialog by viewModel.showSizeDialog.collectAsState()
     val searchState by searchViewModel.uiState.collectAsState()
     val locationState by locationViewModel.uiState.collectAsState()
-
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
@@ -288,7 +284,7 @@ fun HomeScreen(navController: NavHostController = rememberNavController()) {
                                         fontSize = 16.sp
                                     )
                                     if (index < searchState.searchHistory.lastIndex) {
-                                        Divider(color = Color(0xFF3A3A3A))
+                                        HorizontalDivider(color = Color(0xFF3A3A3A))
                                     }
                                 }
                             } else {
@@ -479,9 +475,12 @@ fun HomeScreen(navController: NavHostController = rememberNavController()) {
             SizeSelectionDialog(
                 coffee = coffee,
                 onDismiss = { viewModel.hideSizeSelectionDialog() },
-                onSizeSelected = { selectedSize -> cartViewModel.addToCart(coffee.id, selectedSize) }
+                onSizeSelected = { selectedSize ->
+                    cartViewModel.addToCart(coffee.id, selectedSize)
+                }
             )
         }
+
     }
 
     if (locationState.showAddressDialog) {
@@ -596,11 +595,6 @@ fun PopularProductCard(
         }
     }
 }
-
-
-
-
-
 
 
 @Composable
@@ -841,12 +835,8 @@ fun AddressItem(
         }
     }
 
-    Divider(
-        color = Color(0xFF3A3A3A),
-        thickness = 1.dp
-    )
+    HorizontalDivider(color = Color(0xFF3A3A3A))
 }
-
 
 
 @Composable
@@ -906,12 +896,21 @@ fun SellerChipCard(seller: SellerResponse, onClick: () -> Unit) {
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.ShoppingCart,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.size(28.dp)
-                )
+                if (!seller.logoImage.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = seller.logoImage,
+                        contentDescription = seller.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.ShoppingCart,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
             Text(
                 text = seller.name,
