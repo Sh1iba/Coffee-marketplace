@@ -209,21 +209,32 @@ fun OrderScreen(
         )
     }
 
-    if (locationState.showAddressDialog) {
-        AddressSelectionDialog(
-            currentAddress = locationState.selectedAddress,
-            searchQuery = locationState.addressSearchQuery,
-            onSearchQueryChange = { locationViewModel.onAddressSearchQueryChange(it) },
-            searchResults = locationState.addressSearchResults,
-            isLoading = locationState.isAddressLoading,
-            onAddressSelected = { address ->
-                val addressText = address.toString()
-                locationViewModel.onAddressSelected(addressText)
-                viewModel.clearAddressNote(locationState.selectedAddress)
+    if (locationState.showMyAddressesDialog) {
+        SavedAddressesDialog(
+            savedAddresses = locationState.savedAddresses,
+            onSelect = locationViewModel::confirmSavedAddress,
+            onDelete = locationViewModel::deleteSavedAddress,
+            onEditAddress = locationViewModel::startEditingSavedAddress,
+            onAddNew = {
+                locationViewModel.onShowMyAddressesDialogChange(false)
+                locationViewModel.onShowAddressDialogChange(true)
             },
-            onDismiss = { locationViewModel.onShowAddressDialogChange(false) },
-            isTablet = false,
-            screenHeight = LocalConfiguration.current.screenHeightDp.dp
+            onDismiss = { locationViewModel.onShowMyAddressesDialogChange(false) }
+        )
+    }
+
+    if (locationState.showAddressDialog) {
+        YandexLocationPickerDialog(
+            state = locationState,
+            onSearchQueryChange = locationViewModel::onAddressSearchQueryChange,
+            onCameraPositionChanged = locationViewModel::onCameraPositionChanged,
+            onApartmentChange = locationViewModel::onApartmentChange,
+            onEntranceChange = locationViewModel::onEntranceChange,
+            onFloorChange = locationViewModel::onFloorChange,
+            onIntercomChange = locationViewModel::onIntercomChange,
+            onCourierCommentChange = locationViewModel::onCourierCommentChange,
+            onConfirm = locationViewModel::confirmLocation,
+            onDismiss = { locationViewModel.onShowAddressDialogChange(false) }
         )
     }
 
@@ -333,7 +344,13 @@ fun OrderScreen(
                         selectedButton = selectedButton,
                         selectedBranch = selectedBranch,
                         hasBranches = branches.isNotEmpty(),
-                        onLocationClick = { locationViewModel.onShowAddressDialogChange(true) },
+                        onLocationClick = {
+                            if (locationState.savedAddresses.isEmpty()) {
+                                locationViewModel.onShowAddressDialogChange(true)
+                            } else {
+                                locationViewModel.onShowMyAddressesDialogChange(true)
+                            }
+                        },
                         onNoteClick = { viewModel.showNoteDialog() },
                         onSelectedButtonChange = { newButton -> selectedButton = newButton },
                         onBranchClick = { showBranchPickerDialog = true }

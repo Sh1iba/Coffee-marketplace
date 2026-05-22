@@ -18,7 +18,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -28,29 +31,38 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.twotone.ArrowBack
+import androidx.compose.material.icons.twotone.Place
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +74,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -70,10 +83,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -82,8 +95,18 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import java.net.URLEncoder
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import com.yandex.mapkit.MapKitFactory
+import com.yandex.mapkit.geometry.Point
+import com.yandex.mapkit.map.CameraListener
+import com.yandex.mapkit.map.CameraPosition
+import com.yandex.mapkit.map.CameraUpdateReason
+import com.yandex.mapkit.map.Map as YMap
+import com.yandex.mapkit.mapview.MapView as YMapView
 import com.example.coffeeshop.R
-import com.example.coffeeshop.data.remote.response.NominatimAddress
 import com.example.coffeeshop.data.remote.response.ProductResponse
 import com.example.coffeeshop.data.remote.response.SellerResponse
 import com.example.coffeeshop.navigation.NavigationRoutes
@@ -93,7 +116,9 @@ import com.example.coffeeshop.presentation.theme.colorGrey
 import com.example.coffeeshop.presentation.theme.colorGreyWhite
 import com.example.coffeeshop.presentation.viewmodel.CartViewModel
 import com.example.coffeeshop.presentation.viewmodel.HomeViewModel
+import com.example.coffeeshop.presentation.viewmodel.LocationState
 import com.example.coffeeshop.presentation.viewmodel.LocationViewModel
+import com.example.coffeeshop.data.managers.SavedAddress
 import com.example.coffeeshop.presentation.viewmodel.SearchViewModel
 
 
@@ -151,7 +176,13 @@ fun HomeScreen(navController: NavHostController = rememberNavController()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { locationViewModel.onShowAddressDialogChange(true) },
+                                .clickable {
+                                    if (locationState.savedAddresses.isEmpty()) {
+                                        locationViewModel.onShowAddressDialogChange(true)
+                                    } else {
+                                        locationViewModel.onShowMyAddressesDialogChange(true)
+                                    }
+                                },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -483,20 +514,32 @@ fun HomeScreen(navController: NavHostController = rememberNavController()) {
 
     }
 
+    if (locationState.showMyAddressesDialog) {
+        SavedAddressesDialog(
+            savedAddresses = locationState.savedAddresses,
+            onSelect = locationViewModel::confirmSavedAddress,
+            onDelete = locationViewModel::deleteSavedAddress,
+            onEditAddress = locationViewModel::startEditingSavedAddress,
+            onAddNew = {
+                locationViewModel.onShowMyAddressesDialogChange(false)
+                locationViewModel.onShowAddressDialogChange(true)
+            },
+            onDismiss = { locationViewModel.onShowMyAddressesDialogChange(false) }
+        )
+    }
+
     if (locationState.showAddressDialog) {
-        val configuration = LocalConfiguration.current
-        val screenHeight = configuration.screenHeightDp.dp
-        val isTablet = configuration.screenWidthDp >= 600
-        AddressSelectionDialog(
-            currentAddress = locationState.selectedAddress,
-            searchQuery = locationState.addressSearchQuery,
+        YandexLocationPickerDialog(
+            state = locationState,
             onSearchQueryChange = locationViewModel::onAddressSearchQueryChange,
-            searchResults = locationState.addressSearchResults,
-            isLoading = locationState.isAddressLoading,
-            onAddressSelected = locationViewModel::onAddressSelected,
-            onDismiss = { locationViewModel.onShowAddressDialogChange(false) },
-            isTablet = isTablet,
-            screenHeight = screenHeight
+            onCameraPositionChanged = locationViewModel::onCameraPositionChanged,
+            onApartmentChange = locationViewModel::onApartmentChange,
+            onEntranceChange = locationViewModel::onEntranceChange,
+            onFloorChange = locationViewModel::onFloorChange,
+            onIntercomChange = locationViewModel::onIntercomChange,
+            onCourierCommentChange = locationViewModel::onCourierCommentChange,
+            onConfirm = locationViewModel::confirmLocation,
+            onDismiss = { locationViewModel.onShowAddressDialogChange(false) }
         )
     }
 }
@@ -598,191 +641,307 @@ fun PopularProductCard(
 
 
 @Composable
-fun AddressSelectionDialog(
-    currentAddress: String,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    searchResults: List<NominatimAddress>,
-    isLoading: Boolean,
-    onAddressSelected: (String) -> Unit,
-    onDismiss: () -> Unit,
-    isTablet: Boolean,
-    screenHeight: Dp
+fun SavedAddressesDialog(
+    savedAddresses: List<SavedAddress>,
+    onSelect: (SavedAddress) -> Unit,
+    onDelete: (String) -> Unit,
+    onEditAddress: (SavedAddress) -> Unit,
+    onAddNew: () -> Unit,
+    onDismiss: () -> Unit
 ) {
-    val dialogWidth = when {
-        isTablet -> (screenHeight * 0.6f).coerceAtMost(500.dp)
-        else -> (screenHeight * 0.8f).coerceAtMost(400.dp)
-    }
-
-    val dialogHeight = when {
-        isTablet -> (screenHeight * 0.7f).coerceAtMost(600.dp)
-        else -> (screenHeight * 0.6f).coerceAtMost(500.dp)
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss
-    ) {
+    Dialog(onDismissRequest = onDismiss) {
         Surface(
-            modifier = Modifier
-                .width(dialogWidth)
-                .height(dialogHeight),
-            shape = RoundedCornerShape(if (isTablet) 16.dp else 12.dp),
-            color = Color(0xFF2C2C2C)
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(if (isTablet) 20.dp else 16.dp)
-            ) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Выберите город",
+                        "Мои адреса",
                         fontFamily = SoraFontFamily,
-                        fontWeight = FontWeight.W600,
-                        fontSize = if (isTablet) 20.sp else 18.sp,
-                        color = Color.White
+                        fontWeight = FontWeight.W700,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(if (isTablet) 28.dp else 24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.Gray
-                        )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (isTablet) 56.dp else 52.dp)
-                        .background(
-                            color = Color(0xFF3A3A3A),
-                            shape = RoundedCornerShape(if (isTablet) 10.dp else 8.dp)
-                        )
-                ) {
+                Spacer(Modifier.height(4.dp))
+                savedAddresses.forEachIndexed { index, addr ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = if (isTablet) 20.dp else 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .clickable { onSelect(addr) }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(if (isTablet) 22.dp else 20.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(if (isTablet) 14.dp else 12.dp))
-
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = onSearchQueryChange,
-                            textStyle = TextStyle(
-                                fontSize = if (isTablet) 18.sp else 16.sp,
-                                color = Color.White,
-                                fontFamily = SoraFontFamily
-                            ),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            decorationBox = { innerTextField ->
-                                Box {
-                                    if (searchQuery.isEmpty()) {
-                                        Text(
-                                            text = "Поиск города...",
-                                            fontSize = if (isTablet) 18.sp else 16.sp,
-                                            color = Color.Gray,
-                                            fontFamily = SoraFontFamily
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            }
-                        )
-
-                        if (searchQuery.isNotEmpty()) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(if (isTablet) 22.dp else 20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = colorDarkOrange
-                                )
-                            } else {
-                                IconButton(
-                                    onClick = { onSearchQueryChange("") },
-                                    modifier = Modifier.size(if (isTablet) 22.dp else 20.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Clear",
-                                        tint = Color.Gray
-                                    )
-                                }
-                            }
+                        Icon(Icons.Default.LocationOn, null, tint = colorDarkOrange, modifier = Modifier.size(20.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                addr.label,
+                                fontFamily = SoraFontFamily,
+                                fontWeight = FontWeight.W600,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                addr.address,
+                                fontFamily = SoraFontFamily,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        IconButton(onClick = { onEditAddress(addr) }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Изменить адрес",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = { onDelete(addr.id) }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
-
-                LazyColumn(
-                    modifier = Modifier.weight(1f)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = onAddNew,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colorDarkOrange)
                 ) {
-                    if (searchQuery.length >= 2) {
-                        if (isLoading) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(if (isTablet) 20.dp else 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(color = colorDarkOrange)
-                                }
-                            }
-                        } else if (searchResults.isNotEmpty()) {
-                            items(searchResults) { address ->
-                                AddressItem(
-                                    address = address.display_name,
-                                    isSelected = address.display_name == currentAddress,
-                                    onClick = { onAddressSelected(address.display_name) },
-                                    isTablet = isTablet
-                                )
-                            }
-                        } else {
-                            item {
-                                Text(
-                                    text = "Городов по запросу \"$searchQuery\" не найдено",
-                                    fontFamily = SoraFontFamily,
-                                    fontSize = if (isTablet) 16.sp else 14.sp,
-                                    color = Color.Gray,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(if (isTablet) 20.dp else 16.dp)
-                                        .wrapContentWidth()
-                                )
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp), tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Добавить новый адрес", fontFamily = SoraFontFamily, fontWeight = FontWeight.W600, fontSize = 15.sp, color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun YandexLocationPickerDialog(
+    state: LocationState,
+    onSearchQueryChange: (String) -> Unit,
+    onCameraPositionChanged: (Double, Double) -> Unit,
+    onApartmentChange: (String) -> Unit,
+    onEntranceChange: (String) -> Unit,
+    onFloorChange: (String) -> Unit,
+    onIntercomChange: (String) -> Unit,
+    onCourierCommentChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
+            ) {
+                // ── Шапка ─────────────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(horizontal = 8.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.TwoTone.ArrowBack,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "Выберите адрес доставки",
+                        fontFamily = SoraFontFamily,
+                        fontWeight = FontWeight.W700,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // ── Поиск ──────────────────────────────────────────────────
+                OutlinedTextField(
+                    value = state.addressSearchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = { Text("Найти адрес...", fontFamily = SoraFontFamily) },
+                    leadingIcon = {
+                        if (state.isAddressLoading)
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = colorDarkOrange)
+                        else
+                            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
+                    trailingIcon = {
+                        if (state.addressSearchQuery.isNotBlank()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                    } else {
-                        item {
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colorDarkOrange,
+                        focusedLabelColor = colorDarkOrange
+                    )
+                )
+
+                if (state.searchError.isNotBlank()) {
+                    Text(
+                        text = state.searchError,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        fontFamily = SoraFontFamily,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                // ── Карта ──────────────────────────────────────────────────
+                HomeYandexMapPicker(
+                    initialLat = state.lat,
+                    initialLon = state.lon,
+                    targetPoint = state.targetPoint,
+                    onCameraIdle = onCameraPositionChanged,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+
+                // ── Нижняя панель (Delivery Club стиль) ────────────────────
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 16.dp,
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Обнаруженный адрес
+                        if (state.detectedAddress.isNotBlank()) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.TwoTone.Place,
+                                    contentDescription = null,
+                                    tint = colorDarkOrange,
+                                    modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                                )
+                                Text(
+                                    text = state.detectedAddress,
+                                    fontFamily = SoraFontFamily,
+                                    fontWeight = FontWeight.W600,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+                        }
+
+                        // Квартира / Подъезд / Этаж
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            AddressSmallField(
+                                value = state.apartment,
+                                onValueChange = onApartmentChange,
+                                label = "Квартира",
+                                modifier = Modifier.weight(1.2f)
+                            )
+                            AddressSmallField(
+                                value = state.entrance,
+                                onValueChange = onEntranceChange,
+                                label = "Подъезд",
+                                modifier = Modifier.weight(1f)
+                            )
+                            AddressSmallField(
+                                value = state.floor,
+                                onValueChange = onFloorChange,
+                                label = "Этаж",
+                                modifier = Modifier.weight(0.8f)
+                            )
+                        }
+
+                        // Домофон
+                        OutlinedTextField(
+                            value = state.intercom,
+                            onValueChange = onIntercomChange,
+                            label = { Text("Домофон", fontFamily = SoraFontFamily, fontSize = 12.sp) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colorDarkOrange,
+                                focusedLabelColor = colorDarkOrange
+                            )
+                        )
+
+                        // Комментарий к курьеру
+                        OutlinedTextField(
+                            value = state.courierComment,
+                            onValueChange = onCourierCommentChange,
+                            label = { Text("Комментарий к курьеру", fontFamily = SoraFontFamily, fontSize = 12.sp) },
+                            placeholder = { Text("Например: оставить у двери", fontFamily = SoraFontFamily, fontSize = 13.sp, color = Color.Gray) },
+                            singleLine = false,
+                            maxLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colorDarkOrange,
+                                focusedLabelColor = colorDarkOrange
+                            )
+                        )
+
+                        // Кнопка подтверждения
+                        Button(
+                            onClick = onConfirm,
+                            enabled = state.detectedAddress.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colorDarkOrange,
+                                disabledContainerColor = colorDarkOrange.copy(alpha = 0.35f)
+                            )
+                        ) {
                             Text(
-                                text = "Введите 2+ символа для поиска",
+                                text = "Подтвердить адрес",
                                 fontFamily = SoraFontFamily,
-                                fontSize = if (isTablet) 16.sp else 14.sp,
-                                color = Color.Gray,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(if (isTablet) 20.dp else 16.dp)
-                                    .wrapContentWidth()
+                                fontWeight = FontWeight.W600,
+                                fontSize = 16.sp,
+                                color = Color.White
                             )
                         }
                     }
@@ -792,50 +951,90 @@ fun AddressSelectionDialog(
     }
 }
 
+@Composable
+private fun AddressSmallField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, fontFamily = SoraFontFamily, fontSize = 11.sp) },
+        singleLine = true,
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = colorDarkOrange,
+            focusedLabelColor = colorDarkOrange
+        )
+    )
+}
 
 @Composable
-fun AddressItem(
-    address: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    isTablet: Boolean
+private fun HomeYandexMapPicker(
+    initialLat: Double = 55.751244,
+    initialLon: Double = 37.618423,
+    targetPoint: Pair<Double, Double>? = null,
+    onCameraIdle: (Double, Double) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = if (isTablet) 14.dp else 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.LocationOn,
-            contentDescription = "Location",
-            tint = colorDarkOrange,
-            modifier = Modifier.size(if (isTablet) 22.dp else 20.dp)
-        )
+    val context = LocalContext.current
+    val mapView = remember { YMapView(context) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val onCameraIdleLatest = rememberUpdatedState(onCameraIdle)
 
-        Spacer(modifier = Modifier.width(if (isTablet) 14.dp else 12.dp))
-
-        Text(
-            text = address,
-            fontFamily = SoraFontFamily,
-            fontSize = if (isTablet) 16.sp else 14.sp,
-            color = if (isSelected) colorDarkOrange else Color.White,
-            modifier = Modifier.weight(1f)
-        )
-
-        if (isSelected) {
-            Spacer(modifier = Modifier.width(if (isTablet) 10.dp else 8.dp))
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Selected",
-                tint = colorDarkOrange,
-                modifier = Modifier.size(if (isTablet) 18.dp else 16.dp)
-            )
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> { MapKitFactory.getInstance().onStart(); mapView.onStart() }
+                Lifecycle.Event.ON_STOP -> { mapView.onStop(); MapKitFactory.getInstance().onStop() }
+                else -> {}
+            }
         }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
 
-    HorizontalDivider(color = Color(0xFF3A3A3A))
+    val lastTargetRef = remember { arrayOfNulls<Pair<Double, Double>>(1) }
+
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = {
+                mapView.apply {
+                    map.move(CameraPosition(Point(initialLat, initialLon), 12f, 0f, 0f))
+                    map.addCameraListener(object : CameraListener {
+                        override fun onCameraPositionChanged(
+                            p0: YMap, pos: CameraPosition,
+                            reason: CameraUpdateReason, finished: Boolean
+                        ) {
+                            if (finished) {
+                                onCameraIdleLatest.value(pos.target.latitude, pos.target.longitude)
+                            }
+                        }
+                    })
+                }
+            },
+            update = { view ->
+                if (targetPoint != null && targetPoint != lastTargetRef[0]) {
+                    lastTargetRef[0] = targetPoint
+                    val (la, lo) = targetPoint
+                    view.map.move(CameraPosition(Point(la, lo), 15f, 0f, 0f))
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+        Icon(
+            imageVector = Icons.TwoTone.Place,
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = (-18).dp)
+                .size(40.dp),
+            tint = colorDarkOrange
+        )
+    }
 }
 
 
